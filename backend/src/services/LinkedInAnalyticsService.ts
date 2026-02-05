@@ -409,8 +409,10 @@ export class LinkedInAnalyticsService {
   }
 
   /**
-   * Calculate visibility score based on real LinkedIn data
-   * Score is 0-100 based on weighted metrics
+   * Calculate visibility score based on project specification:
+   * Velocity (40%): Engagement rate = (reactions + comments*2) / impressions
+   * Network Reach (30%): Viral coefficient = impressions / followers
+   * Consistency (30%): Activity bonus
    */
   private static calculateVisibilityScore(metrics: {
     followerCount: number;
@@ -423,40 +425,38 @@ export class LinkedInAnalyticsService {
     const {
       followerCount,
       totalImpressions,
-      totalMembersReached,
       totalReactions,
       totalComments,
-      totalReshares,
     } = metrics;
 
-    // Weights for each metric
-    const weights = {
-      impressions: 0.25, // How many saw your content
-      membersReached: 0.20, // Unique viewers
-      reactions: 0.15, // Engagement: reactions
-      comments: 0.20, // Engagement: comments (higher weight - shows quality)
-      reshares: 0.10, // Viral potential
-      followers: 0.10, // Audience size
-    };
+    // Velocity Score (40 points max)
+    // Engagement rate = (reactions + comments*2) / impressions
+    const engagementRate = totalImpressions > 0
+      ? ((totalReactions + totalComments * 2) / totalImpressions) * 100
+      : 0;
+    // Good engagement rate on LinkedIn is 2-5%, excellent is 5%+
+    const velocityScore = Math.min(40, engagementRate * 8);
 
-    // Normalize each metric (0-100 scale)
-    // These thresholds can be adjusted based on typical LinkedIn performance
-    const impressionScore = Math.min((totalImpressions / 10000) * 100, 100);
-    const reachScore = Math.min((totalMembersReached / 5000) * 100, 100);
-    const reactionScore = Math.min((totalReactions / 500) * 100, 100);
-    const commentScore = Math.min((totalComments / 100) * 100, 100);
-    const reshareScore = Math.min((totalReshares / 50) * 100, 100);
-    const followerScore = Math.min((followerCount / 1000) * 100, 100);
+    // Network Reach Score (30 points max)
+    // Viral coefficient = impressions / followers (how far content reaches beyond network)
+    const viralCoefficient = followerCount > 0
+      ? totalImpressions / followerCount
+      : (totalImpressions > 0 ? 10 : 0); // New accounts with impressions but few followers
+    // Viral coefficient of 10+ is excellent (content reaching 10x your followers)
+    const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
 
-    const score =
-      impressionScore * weights.impressions +
-      reachScore * weights.membersReached +
-      reactionScore * weights.reactions +
-      commentScore * weights.comments +
-      reshareScore * weights.reshares +
-      followerScore * weights.followers;
+    // Consistency Score (30 points max)
+    // Base it on having recent activity
+    const hasActivity = totalImpressions > 0 || totalReactions > 0;
+    const consistencyScore = hasActivity ? 15 : 0;
 
-    return Math.round(score);
+    const score = Math.min(100,
+      Math.round(velocityScore + networkReachScore + consistencyScore)
+    );
+
+    console.log(`📊 [Service] Visibility: velocity=${velocityScore.toFixed(1)}/40, reach=${networkReachScore.toFixed(1)}/30, consistency=${consistencyScore}/30 = ${score}`);
+
+    return score;
   }
 
   /**
