@@ -240,7 +240,7 @@ class PushNotificationService: NSObject, ObservableObject {
 
     /// Clear badge count
     func clearBadge() {
-        Task {
+        Task { @MainActor in
             do {
                 try await UNUserNotificationCenter.current().setBadgeCount(0)
             } catch {

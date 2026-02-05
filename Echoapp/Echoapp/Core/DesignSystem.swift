@@ -60,6 +60,7 @@ extension Color {
     static let accentLightBlue = Color(hex: "66B3FF")
     static let successGreen = Color(hex: "33CC66")
     static let warningYellow = Color(hex: "FFA500")
+    static let warningOrange = Color(hex: "FF8C00")
     static let errorRed = Color(hex: "FF4D4D")
 }
 
