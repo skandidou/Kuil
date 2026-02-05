@@ -161,7 +161,13 @@ class LinkedInService: NSObject, ObservableObject {
         authSession = nil
         authContinuation = nil
 
-        let authURL = URL(string: Config.backendURL + "/auth/linkedin-analytics")!
+        // Get JWT token for authentication
+        guard let jwt = try? KeychainService.getJWT(), let token = jwt else {
+            throw LinkedInError.invalidCallback
+        }
+
+        // Include JWT in query parameter for browser-based OAuth flow
+        let authURL = URL(string: Config.backendURL + "/auth/linkedin-analytics?token=\(token)")!
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self = self else {

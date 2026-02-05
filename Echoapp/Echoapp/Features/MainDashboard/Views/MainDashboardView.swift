@@ -160,16 +160,16 @@ struct DashboardHomeView: View {
                                 } else {
                                     // Empty state
                                     VStack(spacing: Spacing.xs) {
-                                        Image(systemName: "chart.line.uptrend.xyaxis")
+                                        Image(systemName: "chart.bar.xaxis")
                                             .font(.system(size: 40))
                                             .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
 
-                                        Text("Start posting")
+                                        Text("Connectez vos analytics")
                                             .font(.caption)
                                             .fontWeight(.semibold)
                                             .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
-                                        Text("to unlock your score")
+                                        Text("pour voir votre score")
                                             .font(.caption2)
                                             .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     }

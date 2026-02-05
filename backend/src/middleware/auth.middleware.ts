@@ -13,14 +13,22 @@ export const authenticate = (
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Try Authorization header first, then query parameter (for browser redirects)
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Remove 'Bearer '
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      // Fallback to query parameter for OAuth flows (browser-based redirects)
+      token = req.query.token;
+    }
+
+    if (!token) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Missing or invalid authorization header',
       });
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer '
     const decoded = AuthService.verifyJWT(token);
 
     if (!decoded) {
