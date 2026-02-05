@@ -8,6 +8,7 @@ const router = Router();
 /**
  * GET /api/analytics
  * Get user analytics - uses LinkedIn Community Management API (separate OAuth app)
+ * CACHING: Data is fetched from LinkedIn API at most once per hour to avoid rate limits
  */
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -31,8 +32,9 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     let totalComments = 0;
     let totalReshares = 0;
     let analyticsConnected = false;
+    let usingCachedData = false;
 
-    // Get local posts count first (needed for rate limit fallback)
+    // Get local posts count first
     const postsStatsResult = await query(
       `SELECT COUNT(*) as total_posts FROM generated_posts WHERE user_id = $1 AND status = 'published'`,
       [req.userId]
@@ -41,140 +43,195 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Try to get real LinkedIn data if token exists
     if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
-      console.log('📊 Analytics token found, testing LinkedIn API...');
-      console.log('📊 Token (encrypted preview):', analyticsToken.substring(0, 50) + '...');
+      console.log('📊 Analytics token found, checking cache...');
 
-      try {
-        // Fetch data from LinkedIn API with error tracking
-        const apiErrors: string[] = [];
-        let isRateLimited = false;
+      // STEP 1: Check if we have a fresh snapshot (< 1 hour old)
+      const isFresh = await LinkedInAnalyticsService.isSnapshotFresh(req.userId!, 60); // 60 minutes
 
-        const [followers, impressions, reactions, comments, reshares] = await Promise.all([
-          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch((e) => {
-            apiErrors.push(`followers: ${e.message}`);
-            console.error('❌ getFollowerCount failed:', e.message);
-            return 0;
-          }),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch((e) => {
-            if (e.message === 'RATE_LIMITED') isRateLimited = true;
-            apiErrors.push(`impressions: ${e.message}`);
-            console.error('❌ getImpression failed:', e.message);
-            return -1; // Use -1 to indicate rate limited
-          }),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch((e) => {
-            if (e.message === 'RATE_LIMITED') isRateLimited = true;
-            console.error('❌ getReaction failed:', e.message);
-            return -1;
-          }),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch((e) => {
-            if (e.message === 'RATE_LIMITED') isRateLimited = true;
-            console.error('❌ getComment failed:', e.message);
-            return -1;
-          }),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch((e) => {
-            if (e.message === 'RATE_LIMITED') isRateLimited = true;
-            console.error('❌ getReshare failed:', e.message);
-            return -1;
-          }),
-        ]);
-
-        // If rate limited, try to use cached data from latest snapshot
-        if (isRateLimited) {
-          console.log('⚠️ Rate limited by LinkedIn API - using cached data');
-          const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
-          if (cachedSnapshot) {
-            console.log('✅ Using cached snapshot from:', cachedSnapshot.snapshotDate);
-            return res.json({
-              analyticsConnected: true,
-              visibilityScore: cachedSnapshot.visibilityScore,
-              scoreChange: 0,
-              followerCount: followers > 0 ? followers : cachedSnapshot.followerCount,
-              connectionCount: cachedSnapshot.connectionCount,
-              totalImpressions: cachedSnapshot.totalImpressions,
-              totalMembersReached: cachedSnapshot.totalMembersReached,
-              totalReactions: cachedSnapshot.totalReactions,
-              totalComments: cachedSnapshot.totalComments,
-              totalReshares: cachedSnapshot.totalReshares,
-              engagementRate: cachedSnapshot.engagementRate,
-              totalPosts: localPosts,
-              publishedPosts: 0,
-              draftPosts: 0,
-              totalEngagement: cachedSnapshot.totalReactions + cachedSnapshot.totalComments + cachedSnapshot.totalReshares,
-              totalLikes: cachedSnapshot.totalReactions,
-              totalShares: cachedSnapshot.totalReshares,
-              avgHookScore: 0,
-              topPosts: [],
-              lastUpdated: cachedSnapshot.snapshotDate.toISOString(),
-              message: 'Using cached data (LinkedIn API rate limited)',
-            });
-          }
-        }
-
-        // Only mark as connected if we got SOME data or no critical errors
-        // Note: -1 values mean rate limited, treat as 0 for calculation but mark as connected
-        const actualImpressions = impressions < 0 ? 0 : impressions;
-        const actualReactions = reactions < 0 ? 0 : reactions;
-        const actualComments = comments < 0 ? 0 : comments;
-        const actualReshares = reshares < 0 ? 0 : reshares;
-
-        if (apiErrors.length > 0 && followers === 0 && actualImpressions === 0 && !isRateLimited) {
-          console.log('⚠️ LinkedIn API calls failed, marking as NOT connected');
-          console.log('⚠️ Errors:', apiErrors);
-          analyticsConnected = false;
-        } else {
+      if (isFresh) {
+        // Use cached data - don't hit LinkedIn API
+        const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+        if (cachedSnapshot) {
+          console.log('✅ Using cached snapshot (< 1 hour old):', cachedSnapshot.snapshotDate);
+          usingCachedData = true;
           analyticsConnected = true;
-          followerCount = followers;
-          totalImpressions = actualImpressions;
-          totalReactions = actualReactions;
-          totalComments = actualComments;
-          totalReshares = actualReshares;
+          visibilityScore = cachedSnapshot.visibilityScore;
+          followerCount = cachedSnapshot.followerCount;
+          totalImpressions = cachedSnapshot.totalImpressions;
+          totalReactions = cachedSnapshot.totalReactions;
+          totalComments = cachedSnapshot.totalComments;
+          totalReshares = cachedSnapshot.totalReshares;
 
-          // Calculate visibility score based on project specification:
-          // Velocity (40%): Avg engagement (likes + comments*2) - approximated from total engagement / impressions
-          // Network Reach (30%): Based on impressions relative to follower count (viral coefficient)
-          // Consistency (30%): Will be calculated from posting frequency
-
-          // Velocity Score (40 points max)
-          // Engagement rate = (reactions + comments*2) / impressions
-          const engagementRate = totalImpressions > 0
-            ? ((totalReactions + totalComments * 2) / totalImpressions) * 100
-            : 0;
-          // Good engagement rate on LinkedIn is 2-5%, excellent is 5%+
-          const velocityScore = Math.min(40, engagementRate * 8);
-
-          // Network Reach Score (30 points max)
-          // Viral coefficient = impressions / followers (how far content reaches beyond network)
-          const viralCoefficient = followerCount > 0
-            ? totalImpressions / followerCount
-            : (totalImpressions > 0 ? 10 : 0); // New accounts with impressions but few followers
-          // Viral coefficient of 10+ is excellent (content reaching 10x your followers)
-          const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
-
-          // Consistency Score (30 points max) - will be enhanced with posting frequency data
-          // For now, base it on having recent activity (posts, reactions)
-          const hasActivity = totalImpressions > 0 || totalReactions > 0;
-          const consistencyScore = hasActivity ? 15 : 0; // Base score, will be improved with posting streak data
-
-          visibilityScore = Math.min(100,
-            Math.round(velocityScore + networkReachScore + consistencyScore)
-          );
-
-          console.log(`📊 Visibility breakdown: velocity=${velocityScore.toFixed(1)}/40 (engagement=${engagementRate.toFixed(2)}%), networkReach=${networkReachScore.toFixed(1)}/30 (viral=${viralCoefficient.toFixed(1)}x), consistency=${consistencyScore}/30 = ${visibilityScore}`);
-
-          console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
+          // Get score change
+          scoreChange = await LinkedInAnalyticsService.getScoreChange(req.userId!);
         }
-      } catch (error: any) {
-        console.error('❌ LinkedIn API global error:', error.message);
-        analyticsConnected = false;
+      }
+
+      // STEP 2: If no fresh cache, fetch from LinkedIn API
+      if (!usingCachedData) {
+        console.log('📊 Cache expired or missing, fetching from LinkedIn API...');
+        console.log('📊 Token (encrypted preview):', analyticsToken.substring(0, 50) + '...');
+
+        try {
+          // Fetch data from LinkedIn API with error tracking
+          const apiErrors: string[] = [];
+          let isRateLimited = false;
+
+          const [followers, impressions, reactions, comments, reshares] = await Promise.all([
+            LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch((e) => {
+              apiErrors.push(`followers: ${e.message}`);
+              console.error('❌ getFollowerCount failed:', e.message);
+              return 0;
+            }),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch((e) => {
+              if (e.message === 'RATE_LIMITED') isRateLimited = true;
+              apiErrors.push(`impressions: ${e.message}`);
+              console.error('❌ getImpression failed:', e.message);
+              return -1; // Use -1 to indicate rate limited
+            }),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch((e) => {
+              if (e.message === 'RATE_LIMITED') isRateLimited = true;
+              console.error('❌ getReaction failed:', e.message);
+              return -1;
+            }),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch((e) => {
+              if (e.message === 'RATE_LIMITED') isRateLimited = true;
+              console.error('❌ getComment failed:', e.message);
+              return -1;
+            }),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch((e) => {
+              if (e.message === 'RATE_LIMITED') isRateLimited = true;
+              console.error('❌ getReshare failed:', e.message);
+              return -1;
+            }),
+          ]);
+
+          // If rate limited, try to use cached data from latest snapshot (even if old)
+          if (isRateLimited) {
+            console.log('⚠️ Rate limited by LinkedIn API - using cached data (any age)');
+            const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+            if (cachedSnapshot) {
+              console.log('✅ Using cached snapshot from:', cachedSnapshot.snapshotDate);
+              return res.json({
+                analyticsConnected: true,
+                visibilityScore: cachedSnapshot.visibilityScore,
+                scoreChange: 0,
+                followerCount: followers > 0 ? followers : cachedSnapshot.followerCount,
+                connectionCount: cachedSnapshot.connectionCount,
+                totalImpressions: cachedSnapshot.totalImpressions,
+                totalMembersReached: cachedSnapshot.totalMembersReached,
+                totalReactions: cachedSnapshot.totalReactions,
+                totalComments: cachedSnapshot.totalComments,
+                totalReshares: cachedSnapshot.totalReshares,
+                engagementRate: cachedSnapshot.engagementRate,
+                totalPosts: localPosts,
+                publishedPosts: 0,
+                draftPosts: 0,
+                totalEngagement: cachedSnapshot.totalReactions + cachedSnapshot.totalComments + cachedSnapshot.totalReshares,
+                totalLikes: cachedSnapshot.totalReactions,
+                totalShares: cachedSnapshot.totalReshares,
+                avgHookScore: 0,
+                topPosts: [],
+                lastUpdated: cachedSnapshot.snapshotDate.toISOString(),
+                message: 'Using cached data (LinkedIn API rate limited)',
+              });
+            }
+          }
+
+          // Process successful API response
+          const actualImpressions = impressions < 0 ? 0 : impressions;
+          const actualReactions = reactions < 0 ? 0 : reactions;
+          const actualComments = comments < 0 ? 0 : comments;
+          const actualReshares = reshares < 0 ? 0 : reshares;
+
+          if (apiErrors.length > 0 && followers === 0 && actualImpressions === 0 && !isRateLimited) {
+            console.log('⚠️ LinkedIn API calls failed, marking as NOT connected');
+            console.log('⚠️ Errors:', apiErrors);
+            analyticsConnected = false;
+          } else {
+            analyticsConnected = true;
+            followerCount = followers;
+            totalImpressions = actualImpressions;
+            totalReactions = actualReactions;
+            totalComments = actualComments;
+            totalReshares = actualReshares;
+
+            // Calculate visibility score based on project specification
+            // Velocity Score (40 points max)
+            const engagementRate = totalImpressions > 0
+              ? ((totalReactions + totalComments * 2) / totalImpressions) * 100
+              : 0;
+            const velocityScore = Math.min(40, engagementRate * 8);
+
+            // Network Reach Score (30 points max)
+            const viralCoefficient = followerCount > 0
+              ? totalImpressions / followerCount
+              : (totalImpressions > 0 ? 10 : 0);
+            const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
+
+            // Consistency Score (30 points max)
+            const hasActivity = totalImpressions > 0 || totalReactions > 0;
+            const consistencyScore = hasActivity ? 15 : 0;
+
+            visibilityScore = Math.min(100,
+              Math.round(velocityScore + networkReachScore + consistencyScore)
+            );
+
+            console.log(`📊 Visibility breakdown: velocity=${velocityScore.toFixed(1)}/40 (engagement=${engagementRate.toFixed(2)}%), networkReach=${networkReachScore.toFixed(1)}/30 (viral=${viralCoefficient.toFixed(1)}x), consistency=${consistencyScore}/30 = ${visibilityScore}`);
+            console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
+
+            // STEP 3: Save to cache (create new snapshot)
+            try {
+              const engRate = totalImpressions > 0
+                ? ((totalReactions + totalComments + totalReshares) / totalImpressions) * 100
+                : 0;
+
+              const today = new Date().toISOString().split('T')[0];
+              await query(
+                `INSERT INTO analytics_snapshots (
+                  user_id, follower_count, connection_count,
+                  total_impressions, total_members_reached,
+                  total_reactions, total_comments, total_reshares,
+                  visibility_score, engagement_rate, snapshot_date
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                ON CONFLICT (user_id, snapshot_date)
+                DO UPDATE SET
+                  follower_count = EXCLUDED.follower_count,
+                  connection_count = EXCLUDED.connection_count,
+                  total_impressions = EXCLUDED.total_impressions,
+                  total_members_reached = EXCLUDED.total_members_reached,
+                  total_reactions = EXCLUDED.total_reactions,
+                  total_comments = EXCLUDED.total_comments,
+                  total_reshares = EXCLUDED.total_reshares,
+                  visibility_score = EXCLUDED.visibility_score,
+                  engagement_rate = EXCLUDED.engagement_rate,
+                  created_at = NOW()`,
+                [
+                  req.userId,
+                  followerCount,
+                  0, // connectionCount
+                  totalImpressions,
+                  0, // membersReached
+                  totalReactions,
+                  totalComments,
+                  totalReshares,
+                  visibilityScore,
+                  Math.round(engRate * 100) / 100,
+                  today,
+                ]
+              );
+              console.log('💾 Analytics snapshot saved to cache');
+            } catch (cacheError) {
+              console.error('⚠️ Failed to cache analytics snapshot:', cacheError);
+              // Continue anyway - caching failure shouldn't break the response
+            }
+          }
+        } catch (error: any) {
+          console.error('❌ LinkedIn API global error:', error.message);
+          analyticsConnected = false;
+        }
       }
     }
-
-    // Fallback: Get stats from local database
-    const postsStatsResult = await query(
-      `SELECT COUNT(*) as total_posts FROM generated_posts WHERE user_id = $1 AND status = 'published'`,
-      [req.userId]
-    );
-    const localPosts = parseInt(postsStatsResult.rows[0]?.total_posts || '0');
 
     // If no LinkedIn data, use local posts for basic score
     if (visibilityScore === 0 && localPosts > 0) {
