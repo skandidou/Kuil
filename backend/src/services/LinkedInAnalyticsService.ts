@@ -102,15 +102,32 @@ export class LinkedInAnalyticsService {
   static async getFollowerCount(accessToken: string): Promise<number> {
     try {
       const decryptedToken = AuthService.decryptToken(accessToken);
+      console.log('🔑 [LinkedIn] Decrypted token length:', decryptedToken.length);
+
+      const url = `${this.REST_API_URL}/memberFollowersCount?q=me`;
+      console.log('🌐 [LinkedIn] Calling API:', url);
+      console.log('📋 [LinkedIn] API Version:', this.API_VERSION);
 
       const response = await axios.get<{ elements: FollowerCountElement[] }>(
-        `${this.REST_API_URL}/memberFollowersCount?q=me`,
+        url,
         { headers: this.getHeaders(decryptedToken) }
       );
 
+      console.log('✅ [LinkedIn] Follower response:', JSON.stringify(response.data).substring(0, 300));
+
       const element = response.data.elements?.[0];
-      return element?.memberFollowersCount?.followerCount || 0;
+      const count = element?.memberFollowersCount?.followerCount || 0;
+      console.log('✅ [LinkedIn] Follower count:', count);
+
+      return count;
     } catch (error: any) {
+      console.error('❌ [LinkedIn] getFollowerCount FULL error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: JSON.stringify(error.response?.data),
+        url: error.config?.url,
+      });
       if (error.message === 'SCOPE_UPGRADE_REQUIRED') throw error;
       this.handleApiError(error, 'get follower count');
     }
@@ -170,16 +187,28 @@ export class LinkedInAnalyticsService {
     try {
       const decryptedToken = AuthService.decryptToken(accessToken);
 
+      const url = `${this.REST_API_URL}/memberCreatorPostAnalytics?q=me&queryType=${queryType}`;
+      console.log(`🌐 [LinkedIn] Calling API (${queryType}):`, url);
+
       const response = await axios.get<{ elements: PostAnalyticsElement[] }>(
-        `${this.REST_API_URL}/memberCreatorPostAnalytics?q=me&queryType=${queryType}`,
+        url,
         { headers: this.getHeaders(decryptedToken) }
       );
 
+      console.log(`✅ [LinkedIn] ${queryType} response:`, JSON.stringify(response.data).substring(0, 200));
+
       const element = response.data.elements?.[0];
-      return element?.creatorPostAnalytics?.count || 0;
+      const count = element?.creatorPostAnalytics?.count || 0;
+      console.log(`✅ [LinkedIn] ${queryType} count:`, count);
+
+      return count;
     } catch (error: any) {
+      console.error(`❌ [LinkedIn] getAggregatedPostAnalytics ${queryType} error:`, {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
       if (error.message === 'SCOPE_UPGRADE_REQUIRED') throw error;
-      console.error(`❌ Error fetching ${queryType} analytics:`, error.message);
       return 0; // Return 0 on error, don't fail completely
     }
   }

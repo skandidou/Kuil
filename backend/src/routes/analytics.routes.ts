@@ -34,40 +34,67 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Try to get real LinkedIn data if token exists
     if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
-      analyticsConnected = true;
-      console.log('📊 Fetching real LinkedIn analytics...');
+      console.log('📊 Analytics token found, testing LinkedIn API...');
+      console.log('📊 Token (encrypted preview):', analyticsToken.substring(0, 50) + '...');
 
       try {
-        // Fetch data from LinkedIn API
+        // Fetch data from LinkedIn API with error tracking
+        const apiErrors: string[] = [];
+
         const [followers, impressions, reactions, comments, reshares] = await Promise.all([
-          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
+          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch((e) => {
+            apiErrors.push(`followers: ${e.message}`);
+            console.error('❌ getFollowerCount failed:', e.message);
+            return 0;
+          }),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch((e) => {
+            apiErrors.push(`impressions: ${e.message}`);
+            console.error('❌ getImpression failed:', e.message);
+            return 0;
+          }),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch((e) => {
+            console.error('❌ getReaction failed:', e.message);
+            return 0;
+          }),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch((e) => {
+            console.error('❌ getComment failed:', e.message);
+            return 0;
+          }),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch((e) => {
+            console.error('❌ getReshare failed:', e.message);
+            return 0;
+          }),
         ]);
 
-        followerCount = followers;
-        totalImpressions = impressions;
-        totalReactions = reactions;
-        totalComments = comments;
-        totalReshares = reshares;
+        // Only mark as connected if we got SOME data or no critical errors
+        if (apiErrors.length > 0 && followers === 0 && impressions === 0) {
+          console.log('⚠️ LinkedIn API calls failed, marking as NOT connected');
+          console.log('⚠️ Errors:', apiErrors);
+          analyticsConnected = false;
+        } else {
+          analyticsConnected = true;
+          followerCount = followers;
+          totalImpressions = impressions;
+          totalReactions = reactions;
+          totalComments = comments;
+          totalReshares = reshares;
 
-        // Calculate visibility score
-        visibilityScore = Math.min(100,
-          Math.round(
-            (followerCount / 100) * 10 +
-            (totalImpressions / 1000) * 25 +
-            (totalReactions / 50) * 15 +
-            (totalComments / 20) * 20 +
-            (totalReshares / 10) * 10
-          )
-        );
+          // Calculate visibility score
+          visibilityScore = Math.min(100,
+            Math.round(
+              (followerCount / 100) * 10 +
+              (totalImpressions / 1000) * 25 +
+              (totalReactions / 50) * 15 +
+              (totalComments / 20) * 20 +
+              (totalReshares / 10) * 10
+            )
+          );
 
-        console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
+          console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
+        }
       } catch (error: any) {
-        console.error('❌ LinkedIn API error:', error.message);
-        // Continue with local data fallback
+        console.error('❌ LinkedIn API global error:', error.message);
+        analyticsConnected = false;
       }
     }
 
