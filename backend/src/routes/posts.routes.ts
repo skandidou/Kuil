@@ -281,7 +281,7 @@ router.get('/optimal-time', authenticate, async (req: AuthRequest, res: Response
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
         const prompt = `You are a LinkedIn engagement expert. Analyze this user's posting data and suggest the BEST time to post.
 
@@ -338,7 +338,7 @@ Respond with ONLY valid JSON:
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const prompt = `You are a LinkedIn engagement expert. A ${userRole} with headline "${userHeadline || 'Professional'}" wants to know the best time to post on LinkedIn.
 

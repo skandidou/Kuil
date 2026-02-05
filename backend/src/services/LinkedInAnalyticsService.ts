@@ -4,17 +4,15 @@ import { query } from '../config/database';
 import { AuthService } from './AuthService';
 
 // Types for LinkedIn Community Management API responses
+// Based on actual API responses observed in logs
 interface PostAnalyticsElement {
-  creatorPostAnalytics: {
-    queryType: string;
-    count: number;
-  };
+  count: number;
+  dateRange: object;
+  metricType: object;
 }
 
 interface FollowerCountElement {
-  memberFollowersCount: {
-    followerCount: number;
-  };
+  memberFollowersCount: number;  // Direct number, not nested object
 }
 
 interface FollowerTrendElement {
@@ -116,7 +114,8 @@ export class LinkedInAnalyticsService {
       console.log('✅ [LinkedIn] Follower response:', JSON.stringify(response.data).substring(0, 300));
 
       const element = response.data.elements?.[0];
-      const count = element?.memberFollowersCount?.followerCount || 0;
+      // LinkedIn API returns memberFollowersCount as a direct number, not nested
+      const count = element?.memberFollowersCount || 0;
       console.log('✅ [LinkedIn] Follower count:', count);
 
       return count;
@@ -198,7 +197,8 @@ export class LinkedInAnalyticsService {
       console.log(`✅ [LinkedIn] ${queryType} response:`, JSON.stringify(response.data).substring(0, 200));
 
       const element = response.data.elements?.[0];
-      const count = element?.creatorPostAnalytics?.count || 0;
+      // LinkedIn API returns count directly on the element, not nested in creatorPostAnalytics
+      const count = element?.count || 0;
       console.log(`✅ [LinkedIn] ${queryType} count:`, count);
 
       return count;
@@ -236,7 +236,8 @@ export class LinkedInAnalyticsService {
             { headers: this.getHeaders(decryptedToken) }
           );
           const element = response.data.elements?.[0];
-          results[queryType] = element?.creatorPostAnalytics?.count || 0;
+          // LinkedIn API returns count directly on the element
+          results[queryType] = element?.count || 0;
         } catch {
           results[queryType] = 0;
         }

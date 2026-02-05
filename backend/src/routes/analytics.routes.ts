@@ -552,7 +552,7 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
     const { config } = await import('../config/env');
 
     const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `You are a LinkedIn growth expert analyzing a user's REAL performance data. Generate 3 personalized, actionable insights in French.
 
