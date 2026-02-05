@@ -613,41 +613,16 @@ ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, 
       stack: error.stack?.substring(0, 300),
     });
 
-    // Return fallback insights based on real context data if AI fails
-    // This ensures users always see something useful
-    const fallbackInsights = [];
-
-    // Generate basic insights from context
-    if (context.linkedinPosts?.totalImpressions > 0) {
-      fallbackInsights.push({
-        icon: 'chart.line.uptrend.xyaxis',
-        text: `Vos posts ont généré **${context.linkedinPosts.totalImpressions.toLocaleString()} impressions**. Continuez à publier régulièrement pour augmenter votre portée.`,
-      });
-    }
-
-    if (context.generatedPosts?.total > 0) {
-      fallbackInsights.push({
-        icon: 'bolt.fill',
-        text: `Vous avez créé **${context.generatedPosts.total} posts** avec Kuil. Publiez-les aux heures optimales pour maximiser l'engagement.`,
-      });
-    }
-
-    if (context.linkedinPosts?.totalLikes > 0) {
-      fallbackInsights.push({
-        icon: 'hand.thumbsup.fill',
-        text: `Vos contenus ont reçu **${context.linkedinPosts.totalLikes} réactions**. Analysez vos meilleurs posts pour reproduire ce succès.`,
-      });
-    }
-
-    // If we have no data at all, encourage them to start
-    if (fallbackInsights.length === 0) {
-      fallbackInsights.push({
+    // Return a simple fallback insight when AI fails
+    // We can't access context here as it may not be defined if error occurred early
+    const fallbackInsights = [
+      {
         icon: 'lightbulb.fill',
-        text: 'Commencez à publier des posts pour débloquer des insights personnalisés basés sur vos performances.',
-      });
-    }
+        text: 'Continuez à publier régulièrement pour débloquer des insights personnalisés basés sur vos performances LinkedIn.',
+      },
+    ];
 
-    console.log(`⚠️ Using ${fallbackInsights.length} fallback insights due to Gemini error`);
+    console.log(`⚠️ Using fallback insight due to Gemini error`);
     res.json({ insights: fallbackInsights });
   }
 });
