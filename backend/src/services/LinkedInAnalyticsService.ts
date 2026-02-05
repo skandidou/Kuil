@@ -526,11 +526,13 @@ export class LinkedInAnalyticsService {
   }
 
   /**
-   * Check if snapshot is fresh (less than 1 hour old)
+   * Check if snapshot is fresh (less than 1 hour old) AND has valid data
+   * A snapshot with all zeros is considered stale (likely from a rate limit)
    */
   static async isSnapshotFresh(userId: string, maxAgeMinutes = 60): Promise<boolean> {
     const result = await query(
-      `SELECT created_at FROM analytics_snapshots
+      `SELECT created_at, total_impressions, total_reactions, visibility_score
+       FROM analytics_snapshots
        WHERE user_id = $1 AND snapshot_date = CURRENT_DATE
        ORDER BY created_at DESC
        LIMIT 1`,
@@ -541,10 +543,21 @@ export class LinkedInAnalyticsService {
       return false;
     }
 
-    const createdAt = new Date(result.rows[0].created_at);
+    const row = result.rows[0];
+    const createdAt = new Date(row.created_at);
     const now = new Date();
     const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-    return ageMinutes < maxAgeMinutes;
+    // Check if snapshot has valid data (not all zeros from a rate limit)
+    const hasValidData = parseInt(row.total_impressions) > 0 ||
+                         parseInt(row.total_reactions) > 0 ||
+                         parseInt(row.visibility_score) > 0;
+
+    // Only consider fresh if both time-fresh AND has valid data
+    const isFresh = ageMinutes < maxAgeMinutes && hasValidData;
+
+    console.log(`📊 Snapshot freshness check: age=${Math.round(ageMinutes)}min, hasValidData=${hasValidData}, isFresh=${isFresh}`);
+
+    return isFresh;
   }
 }

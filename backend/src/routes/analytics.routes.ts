@@ -181,49 +181,55 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
             console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
 
             // STEP 3: Save to cache (create new snapshot)
-            try {
-              const engRate = totalImpressions > 0
-                ? ((totalReactions + totalComments + totalReshares) / totalImpressions) * 100
-                : 0;
+            // Only save if we have valid data - never overwrite good data with zeros
+            const hasValidNewData = totalImpressions > 0 || totalReactions > 0 || visibilityScore > 0;
 
-              const today = new Date().toISOString().split('T')[0];
-              await query(
-                `INSERT INTO analytics_snapshots (
-                  user_id, follower_count, connection_count,
-                  total_impressions, total_members_reached,
-                  total_reactions, total_comments, total_reshares,
-                  visibility_score, engagement_rate, snapshot_date
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                ON CONFLICT (user_id, snapshot_date)
-                DO UPDATE SET
-                  follower_count = EXCLUDED.follower_count,
-                  connection_count = EXCLUDED.connection_count,
-                  total_impressions = EXCLUDED.total_impressions,
-                  total_members_reached = EXCLUDED.total_members_reached,
-                  total_reactions = EXCLUDED.total_reactions,
-                  total_comments = EXCLUDED.total_comments,
-                  total_reshares = EXCLUDED.total_reshares,
-                  visibility_score = EXCLUDED.visibility_score,
-                  engagement_rate = EXCLUDED.engagement_rate,
-                  created_at = NOW()`,
-                [
-                  req.userId,
-                  followerCount,
-                  0, // connectionCount
-                  totalImpressions,
-                  0, // membersReached
-                  totalReactions,
-                  totalComments,
-                  totalReshares,
-                  visibilityScore,
-                  Math.round(engRate * 100) / 100,
-                  today,
-                ]
-              );
-              console.log('💾 Analytics snapshot saved to cache');
-            } catch (cacheError) {
-              console.error('⚠️ Failed to cache analytics snapshot:', cacheError);
-              // Continue anyway - caching failure shouldn't break the response
+            if (hasValidNewData) {
+              try {
+                const engRate = totalImpressions > 0
+                  ? ((totalReactions + totalComments + totalReshares) / totalImpressions) * 100
+                  : 0;
+
+                const today = new Date().toISOString().split('T')[0];
+                await query(
+                  `INSERT INTO analytics_snapshots (
+                    user_id, follower_count, connection_count,
+                    total_impressions, total_members_reached,
+                    total_reactions, total_comments, total_reshares,
+                    visibility_score, engagement_rate, snapshot_date
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                  ON CONFLICT (user_id, snapshot_date)
+                  DO UPDATE SET
+                    follower_count = EXCLUDED.follower_count,
+                    connection_count = EXCLUDED.connection_count,
+                    total_impressions = EXCLUDED.total_impressions,
+                    total_members_reached = EXCLUDED.total_members_reached,
+                    total_reactions = EXCLUDED.total_reactions,
+                    total_comments = EXCLUDED.total_comments,
+                    total_reshares = EXCLUDED.total_reshares,
+                    visibility_score = EXCLUDED.visibility_score,
+                    engagement_rate = EXCLUDED.engagement_rate,
+                    created_at = NOW()`,
+                  [
+                    req.userId,
+                    followerCount,
+                    0, // connectionCount
+                    totalImpressions,
+                    0, // membersReached
+                    totalReactions,
+                    totalComments,
+                    totalReshares,
+                    visibilityScore,
+                    Math.round(engRate * 100) / 100,
+                    today,
+                  ]
+                );
+                console.log('💾 Analytics snapshot saved to cache');
+              } catch (cacheError) {
+                console.error('⚠️ Failed to cache analytics snapshot:', cacheError);
+              }
+            } else {
+              console.log('⚠️ Skipping cache save - no valid data to save');
             }
           }
         } catch (error: any) {
