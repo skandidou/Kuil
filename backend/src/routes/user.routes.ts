@@ -4,6 +4,7 @@ import { query } from '../config/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
 import { LinkedInService } from '../services/LinkedInService';
+import { LinkedInAnalyticsService } from '../services/LinkedInAnalyticsService';
 import { Logger } from '../services/LoggerService';
 
 const router = Router();
@@ -90,7 +91,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => 
 
 /**
  * GET /api/user/stats
- * Get user statistics
+ * Get user statistics with real LinkedIn Analytics data
  */
 router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -118,47 +119,78 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       [req.userId]
     );
 
-    // Calculate visibility score (0-100) based on LinkedIn posts
     const totalPosts = parseInt(postsCount.rows[0].count);
     let visibilityScore = 0;
-    let networkPercentile = 0;
 
-    if (totalPosts >= 1) {  // More forgiving threshold - show score even with 1 post
-      // Get LinkedIn engagement stats
+    // Check if user has LinkedIn Analytics connected
+    const userResult = await query(
+      `SELECT linkedin_analytics_token, linkedin_analytics_token_expires_at FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    const analyticsToken = userResult.rows[0]?.linkedin_analytics_token;
+    const analyticsTokenExpiry = userResult.rows[0]?.linkedin_analytics_token_expires_at;
+
+    // If LinkedIn Analytics is connected, use real data
+    if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
+      console.log(`📊 [user/stats] Fetching real LinkedIn data for home screen...`);
+
+      try {
+        const [followers, impressions, reactions, comments, reshares] = await Promise.all([
+          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
+        ]);
+
+        // Calculate visibility score using same formula as analytics page
+        visibilityScore = Math.min(100,
+          Math.round(
+            (followers / 100) * 10 +
+            (impressions / 1000) * 25 +
+            (reactions / 50) * 15 +
+            (comments / 20) * 20 +
+            (reshares / 10) * 10
+          )
+        );
+
+        console.log(`✅ [user/stats] Real LinkedIn visibility score: ${visibilityScore} (followers=${followers}, impressions=${impressions})`);
+      } catch (error: any) {
+        console.error('❌ [user/stats] LinkedIn API error:', error.message);
+        // Fallback to local data calculation
+      }
+    }
+
+    // Fallback: If no LinkedIn Analytics or API failed, use local posts for basic score
+    if (visibilityScore === 0 && totalPosts >= 1) {
       const engagementStats = await query(
         `SELECT
           COALESCE(SUM(likes), 0) as total_likes,
           COALESCE(SUM(comments), 0) as total_comments,
-          COALESCE(SUM(shares), 0) as total_shares,
-          COALESCE(SUM(impressions), 0) as total_impressions
+          COALESCE(SUM(shares), 0) as total_shares
          FROM linkedin_posts
          WHERE user_id = $1`,
         [req.userId]
       );
 
       const likes = parseInt(engagementStats.rows[0].total_likes);
-      const comments = parseInt(engagementStats.rows[0].total_comments);
+      const lcomments = parseInt(engagementStats.rows[0].total_comments);
       const shares = parseInt(engagementStats.rows[0].total_shares);
-      const impressions = parseInt(engagementStats.rows[0].total_impressions);
 
-      // Calculate engagement rate per post
       const avgLikesPerPost = totalPosts > 0 ? likes / totalPosts : 0;
-      const avgCommentsPerPost = totalPosts > 0 ? comments / totalPosts : 0;
+      const avgCommentsPerPost = totalPosts > 0 ? lcomments / totalPosts : 0;
       const avgSharesPerPost = totalPosts > 0 ? shares / totalPosts : 0;
 
-      // Weighted score (0-100)
-      const postFrequencyScore = Math.min(totalPosts * 5, 30);  // Up to 30 points
-      const likesScore = Math.min(avgLikesPerPost * 2, 25);     // Up to 25 points
-      const commentsScore = Math.min(avgCommentsPerPost * 5, 25); // Up to 25 points
-      const sharesScore = Math.min(avgSharesPerPost * 10, 20);  // Up to 20 points
+      const postFrequencyScore = Math.min(totalPosts * 5, 30);
+      const likesScore = Math.min(avgLikesPerPost * 2, 25);
+      const commentsScore = Math.min(avgCommentsPerPost * 5, 25);
+      const sharesScore = Math.min(avgSharesPerPost * 10, 20);
 
       visibilityScore = Math.min(
         Math.round(postFrequencyScore + likesScore + commentsScore + sharesScore),
         100
       );
-
-      // Network percentile (for now, use same as score - in future compare with other users)
-      networkPercentile = visibilityScore;
     }
 
     res.json({

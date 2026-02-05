@@ -177,24 +177,23 @@ struct AnalyticsVisibilityInsightsView: View {
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                            
+
                             Spacer()
-                            
+
                             Text("Engagement Peak")
                                 .font(.caption)
                                 .foregroundColor(.appPrimary)
                         }
                         .padding(.horizontal, Spacing.md)
-                        
-                        // Grid placeholder
-                        RoundedRectangle(cornerRadius: CornerRadius.medium)
-                            .fill(Color.adaptiveSecondaryBackground(colorScheme))
-                            .frame(height: 200)
-                            .overlay(
-                                Text("Best Times Grid")
-                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
-                            )
-                            .padding(.horizontal, Spacing.md)
+
+                        // Heatmap component
+                        BestTimesHeatmapView(
+                            heatmap: viewModel.bestTimesHeatmap,
+                            topSlots: viewModel.topPostingSlots,
+                            dataSource: viewModel.bestTimesDataSource,
+                            isLoading: viewModel.isLoadingBestTimes
+                        )
+                        .padding(.horizontal, Spacing.md)
                     }
                     
                     // AI Growth Insights

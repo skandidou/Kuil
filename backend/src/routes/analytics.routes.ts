@@ -582,12 +582,15 @@ Return ONLY a valid JSON array:
 
 ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, calendar, person.fill`;
 
+    console.log('🤖 Calling Gemini API...');
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
+    console.log('🤖 Gemini raw response (first 500 chars):', responseText.substring(0, 500));
 
     // Parse response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
+      console.error('❌ No valid JSON array in Gemini response');
       throw new Error('No valid JSON in AI response');
     }
 
@@ -595,6 +598,7 @@ ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, 
 
     // Validate insights structure
     if (!Array.isArray(insights) || insights.length === 0) {
+      console.error('❌ Invalid insights format:', insights);
       throw new Error('Invalid insights format');
     }
 
@@ -602,11 +606,49 @@ ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, 
 
     res.json({ insights });
   } catch (error: any) {
-    console.error('Generate insights error:', error.message);
+    console.error('❌ Generate insights error:', {
+      message: error.message,
+      name: error.name,
+      status: error.status,
+      stack: error.stack?.substring(0, 300),
+    });
 
-    // Instead of returning an error, return empty insights
-    // The frontend should handle this gracefully
-    res.json({ insights: [] });
+    // Return fallback insights based on real context data if AI fails
+    // This ensures users always see something useful
+    const fallbackInsights = [];
+
+    // Generate basic insights from context
+    if (context.linkedinPosts?.totalImpressions > 0) {
+      fallbackInsights.push({
+        icon: 'chart.line.uptrend.xyaxis',
+        text: `Vos posts ont généré **${context.linkedinPosts.totalImpressions.toLocaleString()} impressions**. Continuez à publier régulièrement pour augmenter votre portée.`,
+      });
+    }
+
+    if (context.generatedPosts?.total > 0) {
+      fallbackInsights.push({
+        icon: 'bolt.fill',
+        text: `Vous avez créé **${context.generatedPosts.total} posts** avec Kuil. Publiez-les aux heures optimales pour maximiser l'engagement.`,
+      });
+    }
+
+    if (context.linkedinPosts?.totalLikes > 0) {
+      fallbackInsights.push({
+        icon: 'hand.thumbsup.fill',
+        text: `Vos contenus ont reçu **${context.linkedinPosts.totalLikes} réactions**. Analysez vos meilleurs posts pour reproduire ce succès.`,
+      });
+    }
+
+    // If we have no data at all, encourage them to start
+    if (fallbackInsights.length === 0) {
+      fallbackInsights.push({
+        icon: 'lightbulb.fill',
+        text: 'Commencez à publier des posts pour débloquer des insights personnalisés basés sur vos performances.',
+      });
+    }
+
+    console.log(`⚠️ Using ${fallbackInsights.length} fallback insights due to Gemini error`);
+    res.json({ insights: fallbackInsights });
   }
 });
 
@@ -638,6 +680,140 @@ router.post('/track-share', authenticate, async (req: AuthRequest, res: Response
   } catch (error) {
     console.error('Track share error:', error);
     res.status(500).json({ error: 'Failed to track share' });
+  }
+});
+
+/**
+ * GET /api/analytics/best-times
+ * Get best times to post based on user's historical engagement data
+ * Returns a heatmap (7 days x 24 hours) with engagement scores
+ */
+router.get('/best-times', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    console.log(`📅 Fetching best posting times for user ${req.userId}...`);
+
+    // Get user's posts with engagement data by day/hour
+    const postsResult = await query(
+      `SELECT
+        EXTRACT(DOW FROM posted_at) as day_of_week,
+        EXTRACT(HOUR FROM posted_at) as hour,
+        AVG(COALESCE(likes, 0) + COALESCE(comments, 0) * 2 + COALESCE(shares, 0) * 3) as avg_engagement,
+        COUNT(*) as post_count
+       FROM linkedin_posts
+       WHERE user_id = $1 AND posted_at IS NOT NULL
+       GROUP BY day_of_week, hour
+       ORDER BY avg_engagement DESC`,
+      [req.userId]
+    );
+
+    // Also check generated_posts that were published
+    const generatedResult = await query(
+      `SELECT
+        EXTRACT(DOW FROM published_at) as day_of_week,
+        EXTRACT(HOUR FROM published_at) as hour,
+        COUNT(*) as post_count
+       FROM generated_posts
+       WHERE user_id = $1 AND status = 'published' AND published_at IS NOT NULL
+       GROUP BY day_of_week, hour`,
+      [req.userId]
+    );
+
+    // Create a 7x24 heatmap matrix (days x hours)
+    // Initialize with zeros
+    const heatmapData: number[][] = Array(7).fill(null).map(() => Array(24).fill(0));
+
+    // Fill with user's actual data
+    let hasUserData = false;
+    for (const row of postsResult.rows) {
+      const day = parseInt(row.day_of_week);
+      const hour = parseInt(row.hour);
+      const engagement = parseFloat(row.avg_engagement) || 0;
+      if (day >= 0 && day < 7 && hour >= 0 && hour < 24) {
+        heatmapData[day][hour] = Math.round(engagement * 10); // Scale for visibility
+        hasUserData = true;
+      }
+    }
+
+    // If not enough user data, use LinkedIn best practices defaults
+    // These are based on general LinkedIn engagement research
+    if (!hasUserData || postsResult.rows.length < 3) {
+      console.log('📅 Using LinkedIn defaults (not enough user data)');
+
+      // Default best times based on LinkedIn research:
+      // Best days: Tuesday, Wednesday, Thursday
+      // Best hours: 7-8am, 12pm, 5-6pm (business hours)
+      const defaultBestTimes = [
+        // Tuesday (day=2) - Best day
+        { day: 2, hour: 8, score: 100 },
+        { day: 2, hour: 12, score: 95 },
+        { day: 2, hour: 17, score: 90 },
+        // Wednesday (day=3)
+        { day: 3, hour: 9, score: 88 },
+        { day: 3, hour: 12, score: 85 },
+        { day: 3, hour: 18, score: 80 },
+        // Thursday (day=4)
+        { day: 4, hour: 8, score: 82 },
+        { day: 4, hour: 12, score: 78 },
+        { day: 4, hour: 17, score: 75 },
+        // Monday (day=1)
+        { day: 1, hour: 8, score: 70 },
+        { day: 1, hour: 12, score: 68 },
+        // Friday (day=5)
+        { day: 5, hour: 9, score: 60 },
+        { day: 5, hour: 12, score: 55 },
+        // Weekend - lower engagement
+        { day: 0, hour: 10, score: 30 }, // Sunday
+        { day: 6, hour: 11, score: 35 }, // Saturday
+      ];
+
+      for (const slot of defaultBestTimes) {
+        heatmapData[slot.day][slot.hour] = slot.score;
+        // Add some adjacent hours with lower scores for smoother visualization
+        if (slot.hour > 0) heatmapData[slot.day][slot.hour - 1] = Math.round(slot.score * 0.6);
+        if (slot.hour < 23) heatmapData[slot.day][slot.hour + 1] = Math.round(slot.score * 0.6);
+      }
+    }
+
+    // Normalize heatmap to 0-100 scale
+    const maxValue = Math.max(...heatmapData.flat());
+    if (maxValue > 0) {
+      for (let day = 0; day < 7; day++) {
+        for (let hour = 0; hour < 24; hour++) {
+          heatmapData[day][hour] = Math.round((heatmapData[day][hour] / maxValue) * 100);
+        }
+      }
+    }
+
+    // Get top 5 slots for quick display
+    const allSlots: { day: number; hour: number; score: number }[] = [];
+    for (let day = 0; day < 7; day++) {
+      for (let hour = 0; hour < 24; hour++) {
+        if (heatmapData[day][hour] > 0) {
+          allSlots.push({ day, hour, score: heatmapData[day][hour] });
+        }
+      }
+    }
+    const topSlots = allSlots.sort((a, b) => b.score - a.score).slice(0, 5);
+
+    const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
+    console.log(`✅ Best times calculated: ${topSlots.length} top slots, data source: ${hasUserData ? 'user_data' : 'linkedin_defaults'}`);
+
+    res.json({
+      heatmap: heatmapData,
+      topSlots: topSlots.map(slot => ({
+        dayOfWeek: slot.day,
+        dayName: dayNames[slot.day],
+        hour: slot.hour,
+        hourFormatted: `${slot.hour}:00`,
+        score: slot.score,
+      })),
+      dataSource: hasUserData && postsResult.rows.length >= 3 ? 'user_data' : 'linkedin_defaults',
+      totalPostsAnalyzed: postsResult.rows.length + generatedResult.rows.length,
+    });
+  } catch (error) {
+    console.error('Best times error:', error);
+    res.status(500).json({ error: 'Failed to fetch best posting times' });
   }
 });
 

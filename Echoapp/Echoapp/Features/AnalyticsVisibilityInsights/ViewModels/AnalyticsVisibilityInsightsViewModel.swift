@@ -120,6 +120,12 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
     @Published var insights: [InsightModel] = []
     @Published var followerTrends: [FollowerTrendData] = []
 
+    // Best Times to Post
+    @Published var bestTimesHeatmap: [[Double]] = []
+    @Published var topPostingSlots: [PostingSlot] = []
+    @Published var bestTimesDataSource: String = "linkedin_defaults"
+    @Published var isLoadingBestTimes: Bool = false
+
     // Loading states
     @Published var isLoading: Bool = false
     @Published var isLoadingInsights: Bool = false
@@ -143,6 +149,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
 
         loadAnalytics()
         loadInsights()
+        loadBestTimes()
     }
 
     func loadAnalytics() {
@@ -348,6 +355,45 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         }
 
         isSyncing = false
+    }
+
+    // MARK: - Best Times to Post
+
+    func loadBestTimes() {
+        Task {
+            await fetchBestTimes()
+        }
+    }
+
+    func fetchBestTimes() async {
+        isLoadingBestTimes = true
+
+        do {
+            print("🕐 Fetching best times to post...")
+
+            let response: BestTimesResponse = try await APIClient.shared.get(
+                endpoint: "/api/analytics/best-times",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                self.bestTimesHeatmap = response.heatmap
+                self.topPostingSlots = response.topSlots
+                self.bestTimesDataSource = response.dataSource
+            }
+
+            print("✅ Best times loaded: \(response.topSlots.count) top slots, source=\(response.dataSource)")
+        } catch {
+            print("❌ Failed to load best times: \(error)")
+            // Use empty state on error
+            await MainActor.run {
+                self.bestTimesHeatmap = []
+                self.topPostingSlots = []
+                self.bestTimesDataSource = "linkedin_defaults"
+            }
+        }
+
+        isLoadingBestTimes = false
     }
 
     /// Fetch follower trends
