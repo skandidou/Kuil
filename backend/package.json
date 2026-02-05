@@ -1,7 +1,7 @@
 {
   "name": "kuil-backend",
   "version": "1.0.0",
-  "description": "Backend for Kuil - LinkedIn OAuth + Gemini AI integration",
+  "description": "Backend for Kuil - LinkedIn OAuth + Claude AI integration",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
@@ -17,7 +17,8 @@
   },
   "keywords": [
     "linkedin",
-    "gemini",
+    "claude",
+    "anthropic",
     "oauth",
     "ai"
   ],

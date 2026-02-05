@@ -82,7 +82,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
             do {
                 print("🎤 Loading voice signature from backend...")
 
-                if let signature = try await GeminiService.shared.fetchVoiceSignature() {
+                if let signature = try await ClaudeService.shared.fetchVoiceSignature() {
                     await MainActor.run {
                         self.voiceSignature = signature.radarValues
                         self.primaryTone = signature.primaryTone
@@ -92,7 +92,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                 } else {
                     // No existing signature - analyze now
                     print("📊 No voice signature found, analyzing...")
-                    let newSignature = try await GeminiService.shared.analyzeVoiceSignature()
+                    let newSignature = try await ClaudeService.shared.analyzeVoiceSignature()
                     await MainActor.run {
                         self.voiceSignature = newSignature.radarValues
                         self.primaryTone = newSignature.primaryTone
@@ -138,7 +138,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     func reanalyzeProfile() {
         Task {
             do {
-                print("🤖 Starting voice re-analysis with Gemini...")
+                print("🤖 Starting voice re-analysis with Claude...")
 
                 // Call backend API to analyze voice with Gemini
                 let response: VoiceSignatureData = try await APIClient.shared.post(
@@ -192,7 +192,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
             }
 
             // Load voice signature
-            if let signature = try? await GeminiService.shared.fetchVoiceSignature() {
+            if let signature = try? await ClaudeService.shared.fetchVoiceSignature() {
                 voiceSignature = signature.radarValues
                 primaryTone = signature.primaryTone
             }

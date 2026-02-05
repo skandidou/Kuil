@@ -11,10 +11,13 @@ struct Config {
     // MARK: - Backend Configuration
     // TODO: Change to https://api.kuil.ai once DNS is configured on Railway
     #if DEBUG
-    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Development
+    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Development (Railway)
     #else
-    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Production
+    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Production (Railway)
     #endif
+
+    // MARK: - Website
+    static let websiteURL = "https://kuil.ai"
 
     // MARK: - LinkedIn OAuth
     static let linkedInClientID = "78e3x33e8sm40q"

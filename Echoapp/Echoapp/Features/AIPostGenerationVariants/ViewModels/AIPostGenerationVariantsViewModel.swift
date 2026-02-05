@@ -30,8 +30,8 @@ class AIPostGenerationVariantsViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // Call real Gemini AI API to generate post variants
-            let postVariants = try await GeminiService.shared.generatePostVariants(from: topic)
+            // Call Claude AI API to generate post variants
+            let postVariants = try await ClaudeService.shared.generatePostVariants(from: topic)
 
             // Convert API PostVariant to UI UIPostVariant
             variants = postVariants.enumerated().map { index, variant in

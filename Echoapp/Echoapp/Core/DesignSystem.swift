@@ -45,7 +45,7 @@ extension Color {
     }
 
     // BACKWARD COMPATIBILITY (for gradual migration)
-    static let appPrimary = Color(hex: "0066FF") // Electric Blue - works in both modes
+    static let appPrimary = Color(hex: "4540E2") // Kuil Violet - brand color
     static let appBackground = appBackgroundDark // Default to dark for non-migrated views
     static let appSecondaryBackground = appSecondaryBackgroundDark
     static let primaryText = primaryTextDark
@@ -53,6 +53,7 @@ extension Color {
     static let tertiaryText = tertiaryTextDark
 
     // Accent Colors (work in both modes)
+    static let kuilViolet = Color(hex: "4540E2") // Brand primary
     static let accentBlue = Color(hex: "0066FF")
     static let accentCyan = Color(hex: "00D9FF")
     static let accentTeal = Color(hex: "1DE9B6")

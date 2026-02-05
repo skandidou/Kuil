@@ -1,5 +1,5 @@
 //
-//  GeminiService.swift
+//  ClaudeService.swift
 //  Kuil
 //
 //  Created by Claude on 16/01/2026.
@@ -7,9 +7,11 @@
 
 import Foundation
 
+/// AI Service powered by Claude (Anthropic)
+/// Uses Claude Opus 4 for complex tasks, Sonnet 4 for medium, Haiku 3.5 for simple/fast
 @MainActor
-class GeminiService: ObservableObject {
-    static let shared = GeminiService()
+class ClaudeService: ObservableObject {
+    static let shared = ClaudeService()
 
     @Published var voiceSignature: VoiceSignature?
     @Published var isAnalyzing = false
@@ -179,8 +181,13 @@ struct GeneratePostResponse: Codable {
 
 // MARK: - Errors
 
-enum GeminiError: Error {
+enum ClaudeError: Error {
     case noVoiceSignature
     case analysisInProgress
     case invalidTopic
 }
+
+// MARK: - Backward Compatibility
+/// Typealias for backward compatibility with existing code
+typealias GeminiService = ClaudeService
+typealias GeminiError = ClaudeError
