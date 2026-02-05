@@ -1,0 +1,297 @@
+//
+//  MainDashboardViewModel.swift
+//  Kuil
+//
+//  Created by Skander Mabrouk on 12/01/2026.
+//
+
+import SwiftUI
+import Combine
+
+struct InspirationCardModel: Identifiable {
+    let id = UUID()
+    let badge: String
+    let badgeColor: Color
+    let title: String
+    let subtitle: String
+    let imageIcon: String
+    let imageUrl: String?
+}
+
+struct ScheduledItemModel: Identifiable {
+    let id = UUID()
+    let platform: String
+    let title: String
+    let schedule: String
+}
+
+@MainActor
+class MainDashboardViewModel: ObservableObject {
+    @Published var userName: String = "Loading..."
+    @Published var userTitle: String = "Professional"
+    @Published var userRole: String = "Professional"
+    @Published var roleColor: Color = .appPrimary
+    @Published var visibilityScore: Int = 0
+    @Published var scoreChange: Double?
+    @Published var hasUnreadNotifications: Bool = true
+    @Published var inspirationCards: [InspirationCardModel] = []
+    @Published var nextScheduledItem: ScheduledItemModel?
+
+    private var cancellables = Set<AnyCancellable>()
+    private var previousVisibilityScore: Int?
+
+    init() {
+        // Subscribe to AppState for real user data
+        AppState.shared.$userProfile
+            .compactMap { $0 }
+            .sink { [weak self] profile in
+                self?.userName = profile.name.components(separatedBy: " ").first ?? profile.name
+
+                // Use the role selected during onboarding if available
+                if let role = profile.role, !role.isEmpty {
+                    self?.userRole = role
+                    self?.userTitle = role
+                    self?.roleColor = self?.colorForRole(role) ?? .appPrimary
+                } else if let headline = profile.headline, !headline.isEmpty {
+                    // Fallback to headline
+                    let title = headline.components(separatedBy: " at ").first ?? headline
+                    let cleanTitle = title.components(separatedBy: " | ").first ?? title
+                    self?.userTitle = cleanTitle.trimmingCharacters(in: .whitespaces)
+                    self?.userRole = cleanTitle.trimmingCharacters(in: .whitespaces)
+                } else {
+                    self?.userTitle = "LinkedIn Professional"
+                    self?.userRole = "Professional"
+                }
+            }
+            .store(in: &cancellables)
+
+        AppState.shared.$userStats
+            .compactMap { $0 }
+            .sink { [weak self] stats in
+                guard let self = self else { return }
+
+                // Calculate score change if we have a previous score
+                if let previous = self.previousVisibilityScore, previous > 0 {
+                    let change = Double(stats.visibilityScore - previous) / Double(previous) * 100.0
+                    self.scoreChange = change
+                }
+
+                self.previousVisibilityScore = stats.visibilityScore
+                self.visibilityScore = stats.visibilityScore
+            }
+            .store(in: &cancellables)
+
+        loadData()
+    }
+
+    func loadData() {
+        // Load real next scheduled post (no hardcoded data)
+        Task {
+            await loadNextScheduledPost()
+        }
+
+        // Load real stats if not already loaded
+        if AppState.shared.userStats == nil {
+            Task {
+                do {
+                    let stats = try await UserService.shared.fetchStats()
+                    await MainActor.run {
+                        AppState.shared.userStats = stats
+                    }
+                } catch {
+                    print("Failed to load stats: \(error)")
+                }
+            }
+        }
+
+        // Load AI-generated daily inspirations
+        Task {
+            await loadDailyInspirations()
+        }
+    }
+
+    /// Load next scheduled post from backend
+    func loadNextScheduledPost() async {
+        do {
+            print("📅 Loading next scheduled post...")
+
+            struct ScheduledPostsResponse: Codable {
+                let posts: [ScheduledPostItem]
+            }
+
+            struct ScheduledPostItem: Codable {
+                let id: String
+                let content: String
+                let scheduledAt: String
+                let status: String
+            }
+
+            let response: ScheduledPostsResponse = try await APIClient.shared.get(
+                endpoint: "/api/posts/scheduled",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                // Get next upcoming scheduled post (not published)
+                if let nextPost = response.posts.first(where: { $0.status == "scheduled" }) {
+                    // Truncate content to ~25 chars for display
+                    let truncatedTitle = String(nextPost.content.prefix(25)) + (nextPost.content.count > 25 ? "..." : "")
+
+                    self.nextScheduledItem = ScheduledItemModel(
+                        platform: "LINKEDIN SCHEDULE",
+                        title: truncatedTitle,
+                        schedule: formatScheduleDate(nextPost.scheduledAt)
+                    )
+                    print("✅ Next scheduled post loaded: \(truncatedTitle)")
+                } else {
+                    // No scheduled posts - set to nil (UI should handle this)
+                    self.nextScheduledItem = nil
+                    print("ℹ️ No scheduled posts found")
+                }
+            }
+        } catch {
+            print("❌ Failed to load next scheduled post: \(error)")
+            await MainActor.run {
+                self.nextScheduledItem = nil
+            }
+        }
+    }
+
+    /// Format ISO date to user-friendly schedule string
+    func formatScheduleDate(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        // Try with fractional seconds first, then without
+        var date = formatter.date(from: isoString)
+        if date == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            date = formatter.date(from: isoString)
+        }
+
+        guard let scheduleDate = date else { return "Scheduled" }
+
+        let calendar = Calendar.current
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a"
+
+        if calendar.isDateInToday(scheduleDate) {
+            return "Today @ \(timeFormatter.string(from: scheduleDate))"
+        } else if calendar.isDateInTomorrow(scheduleDate) {
+            return "Tomorrow @ \(timeFormatter.string(from: scheduleDate))"
+        } else {
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "EEE @ h:mm a"
+            return dayFormatter.string(from: scheduleDate)
+        }
+    }
+
+    func loadDailyInspirations() async {
+        do {
+            print("💡 Loading daily inspirations...")
+
+            struct DailyInspirationsResponse: Codable {
+                let inspirations: [InspirationData]
+            }
+
+            struct InspirationData: Codable {
+                let badge: String
+                let title: String
+                let subtitle: String
+                let imageUrl: String?
+            }
+
+            let response: DailyInspirationsResponse = try await APIClient.shared.get(
+                endpoint: "/api/voice/daily-inspirations",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                self.inspirationCards = response.inspirations.map { inspiration in
+                    InspirationCardModel(
+                        badge: inspiration.badge,
+                        badgeColor: badgeColor(for: inspiration.badge),
+                        title: inspiration.title,
+                        subtitle: inspiration.subtitle,
+                        imageIcon: badgeIcon(for: inspiration.badge),
+                        imageUrl: inspiration.imageUrl
+                    )
+                }
+            }
+
+            print("✅ Loaded \(response.inspirations.count) daily inspirations")
+        } catch {
+            print("❌ Failed to load inspirations: \(error)")
+            // Fallback to default inspirations
+            let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
+            inspirationCards = [
+                InspirationCardModel(
+                    badge: "TRENDING",
+                    badgeColor: .appPrimary,
+                    title: "What top founders are saying about 2026",
+                    subtitle: "Based on recent CEO interviews",
+                    imageIcon: "chart.line.uptrend.xyaxis",
+                    imageUrl: "https://source.unsplash.com/560x280/?startup,founder&sig=\(dayOfYear)"
+                )
+            ]
+        }
+    }
+
+    func badgeColor(for badge: String) -> Color {
+        switch badge.uppercased() {
+        case "AI NEWS", "TECH TREND":
+            return .appPrimary
+        case "BUSINESS", "LEADERSHIP":
+            return .accentCyan
+        case "STARTUP":
+            return .successGreen
+        case "CAREER":
+            return .orange
+        default:
+            return .accentLightBlue
+        }
+    }
+
+    func badgeIcon(for badge: String) -> String {
+        switch badge.uppercased() {
+        case "AI NEWS", "TECH TREND":
+            return "cpu"
+        case "BUSINESS":
+            return "chart.bar.fill"
+        case "LEADERSHIP":
+            return "person.3.fill"
+        case "STARTUP":
+            return "rocket.fill"
+        case "CAREER":
+            return "briefcase.fill"
+        default:
+            return "sparkles"
+        }
+    }
+    
+    func search() {
+        // Handle search
+    }
+
+    func openNotifications() {
+        // Handle notifications
+    }
+
+    /// Returns the accent color for a given user role
+    func colorForRole(_ role: String) -> Color {
+        switch role.lowercased() {
+        case "founder":
+            return .appPrimary // Blue
+        case "job seeker":
+            return Color(red: 0.8, green: 0.2, blue: 0.4) // Pink/Magenta
+        case "creator":
+            return .orange
+        case "freelancer":
+            return .mint
+        case "executive":
+            return Color(red: 0.4, green: 0.4, blue: 0.9) // Indigo
+        default:
+            return .appPrimary
+        }
+    }
+}

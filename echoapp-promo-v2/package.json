@@ -1,0 +1,25 @@
+{
+  "name": "echoapp-promo-v2",
+  "version": "1.0.0",
+  "description": "Premium Apple-style promotional video for Echoapp - AI-powered LinkedIn content creation",
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render EchoappPromo out/echoapp-promo.mp4",
+    "build:vertical": "remotion render EchoappPromoVertical out/echoapp-promo-9x16.mp4",
+    "build:horizontal": "remotion render EchoappPromoHorizontal out/echoapp-promo-16x9.mp4",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.250",
+    "@remotion/google-fonts": "^4.0.250",
+    "@remotion/transitions": "^4.0.250",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.250"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.5"
+  }
+}

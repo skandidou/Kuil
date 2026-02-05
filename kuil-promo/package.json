@@ -1,0 +1,22 @@
+{
+  "name": "kuil-promo",
+  "version": "1.0.0",
+  "description": "Kuil - LinkedIn AI Content Creator Promo Video",
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render KuilPromo out/kuil-promo.mp4",
+    "build:vertical": "remotion render KuilPromoVertical out/kuil-promo-vertical.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}
