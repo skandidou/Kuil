@@ -62,12 +62,14 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     } else {
       // Fetch fresh data from LinkedIn API using analytics token
       console.log('📊 Fetching fresh analytics from LinkedIn API...');
+      console.log('📊 Analytics token (first 20 chars):', analyticsToken?.substring(0, 20) + '...');
       try {
         snapshot = await LinkedInAnalyticsService.fetchAndStoreAnalytics(
           req.userId!,
           analyticsToken // Use analytics token, not OAuth token
         );
       } catch (error: any) {
+        console.error('❌ LinkedIn Analytics API error:', error.message);
         if (error.message === 'SCOPE_UPGRADE_REQUIRED' || error.message === 'ANALYTICS_NOT_CONNECTED') {
           return res.json({
             analyticsConnected: false,
@@ -76,7 +78,21 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
             message: 'Please connect LinkedIn Analytics',
           });
         }
-        throw error;
+        // For any other error, return empty analytics instead of crashing
+        console.error('❌ Analytics fetch failed, returning empty data');
+        return res.json({
+          analyticsConnected: true,
+          analyticsError: error.message,
+          visibilityScore: 0,
+          scoreChange: 0,
+          followerCount: 0,
+          connectionCount: 0,
+          totalImpressions: 0,
+          totalReactions: 0,
+          engagementRate: 0,
+          topPosts: [],
+          message: 'Analytics temporarily unavailable',
+        });
       }
     }
 
