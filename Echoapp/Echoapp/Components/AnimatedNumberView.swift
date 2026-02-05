@@ -12,11 +12,12 @@ struct AnimatedNumberView: View {
     let fontSize: CGFloat
     let fontWeight: Font.Weight
     @State private var displayValue: Double = 0
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         Text("\(Int(displayValue))")
             .font(.system(size: fontSize, weight: fontWeight))
-            .foregroundColor(.primaryText)
+            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
             .onAppear {
                 withAnimation(.easeOut(duration: 1.5)) {
                     displayValue = value

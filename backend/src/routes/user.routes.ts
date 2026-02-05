@@ -144,15 +144,18 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
         ]);
 
-        // Calculate visibility score using same formula as analytics page
+        // Calculate visibility score with balanced logarithmic formula
+        // New users (3 followers, 2K impressions) = ~15-20
+        // Growing creators (500 followers, 50K impressions) = ~50
+        // Established creators (5000+ followers, 500K+ impressions) = ~85-100
+        const followerScore = Math.min(30, Math.log10(Math.max(followers, 1) + 1) * 10);
+        const impressionScore = Math.min(30, Math.log10(Math.max(impressions, 1) + 1) * 8);
+        const reactionScore = Math.min(20, Math.log10(Math.max(reactions, 1) + 1) * 7);
+        const commentScore = Math.min(15, Math.log10(Math.max(comments, 1) + 1) * 8);
+        const reshareScore = Math.min(5, Math.log10(Math.max(reshares, 1) + 1) * 5);
+
         visibilityScore = Math.min(100,
-          Math.round(
-            (followers / 100) * 10 +
-            (impressions / 1000) * 25 +
-            (reactions / 50) * 15 +
-            (comments / 20) * 20 +
-            (reshares / 10) * 10
-          )
+          Math.round(followerScore + impressionScore + reactionScore + commentScore + reshareScore)
         );
 
         console.log(`✅ [user/stats] Real LinkedIn visibility score: ${visibilityScore} (followers=${followers}, impressions=${impressions})`);

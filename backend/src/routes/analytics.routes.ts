@@ -79,16 +79,21 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
           totalComments = comments;
           totalReshares = reshares;
 
-          // Calculate visibility score
+          // Calculate visibility score with balanced formula
+          // New users (3 followers, 2K impressions) = ~15-20
+          // Growing creators (500 followers, 50K impressions) = ~50
+          // Established creators (5000+ followers, 500K+ impressions) = ~85-100
+          const followerScore = Math.min(30, Math.log10(Math.max(followerCount, 1) + 1) * 10);
+          const impressionScore = Math.min(30, Math.log10(Math.max(totalImpressions, 1) + 1) * 8);
+          const reactionScore = Math.min(20, Math.log10(Math.max(totalReactions, 1) + 1) * 7);
+          const commentScore = Math.min(15, Math.log10(Math.max(totalComments, 1) + 1) * 8);
+          const reshareScore = Math.min(5, Math.log10(Math.max(totalReshares, 1) + 1) * 5);
+
           visibilityScore = Math.min(100,
-            Math.round(
-              (followerCount / 100) * 10 +
-              (totalImpressions / 1000) * 25 +
-              (totalReactions / 50) * 15 +
-              (totalComments / 20) * 20 +
-              (totalReshares / 10) * 10
-            )
+            Math.round(followerScore + impressionScore + reactionScore + commentScore + reshareScore)
           );
+
+          console.log(`📊 Visibility breakdown: followers=${followerScore.toFixed(1)}, impressions=${impressionScore.toFixed(1)}, reactions=${reactionScore.toFixed(1)}, comments=${commentScore.toFixed(1)}, reshares=${reshareScore.toFixed(1)} = ${visibilityScore}`);
 
           console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
         }

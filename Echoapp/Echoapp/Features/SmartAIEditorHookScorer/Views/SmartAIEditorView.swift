@@ -11,13 +11,14 @@ import SwiftUI
 struct SmartAIEditorView: View {
     @ObservedObject var viewModel: SmartAIEditorHookScorerViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @FocusState private var isInputFocused: Bool
     @State private var inputText: String = ""
     @State private var showSuccessAnimation = false
 
     var body: some View {
         ZStack {
-            Color.appBackground.ignoresSafeArea()
+            Color.adaptiveBackground(colorScheme).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
@@ -103,11 +104,11 @@ struct SmartAIEditorView: View {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     Text("When should this post go live?")
                         .font(.headline)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                     Text("Choose a date and time to schedule your post")
                         .font(.callout)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.lg)
@@ -153,13 +154,13 @@ struct SmartAIEditorView: View {
                     }) {
                         Text("Cancel")
                             .font(.callout)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
             }
-            .background(Color.appBackground)
+            .background(Color.adaptiveBackground(colorScheme))
             .navigationTitle("Schedule Post")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -192,11 +193,11 @@ struct SmartAIEditorView: View {
                 Text(viewModel.sourceType)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                 Text("AI-Powered Editor")
                     .font(.caption)
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
 
             Spacer()
@@ -208,7 +209,7 @@ struct SmartAIEditorView: View {
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.md)
-        .background(Color.appSecondaryBackground.opacity(0.5))
+        .background(Color.adaptiveSecondaryBackground(colorScheme).opacity(0.5))
     }
 
     // MARK: - Input Section (Mode-Specific)
@@ -223,7 +224,7 @@ struct SmartAIEditorView: View {
                 Text(titleForMode)
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
             }
 
             // Input field (type depends on mode)
@@ -242,7 +243,7 @@ struct SmartAIEditorView: View {
             }
         }
         .padding(Spacing.lg)
-        .background(Color.appSecondaryBackground)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.large)
     }
 
@@ -273,7 +274,7 @@ struct SmartAIEditorView: View {
             TextEditor(text: $inputText)
                 .frame(minHeight: 120)
                 .padding(Spacing.md)
-                .background(Color.appBackground)
+                .background(Color.adaptiveBackground(colorScheme))
                 .cornerRadius(CornerRadius.medium)
                 .focused($isInputFocused)
                 .overlay(
@@ -283,7 +284,7 @@ struct SmartAIEditorView: View {
 
             Text("Share your thoughts, insights, or ideas")
                 .font(.caption)
-                .foregroundColor(.tertiaryText)
+                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
         }
     }
 
@@ -291,7 +292,7 @@ struct SmartAIEditorView: View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 Image(systemName: "link")
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
 
                 TextField("https://example.com/article", text: $inputText)
                     .focused($isInputFocused)
@@ -299,7 +300,7 @@ struct SmartAIEditorView: View {
                     .autocapitalization(.none)
             }
             .padding(Spacing.md)
-            .background(Color.appBackground)
+            .background(Color.adaptiveBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.medium)
@@ -308,7 +309,7 @@ struct SmartAIEditorView: View {
 
             Text("AI will analyze the content and create an engaging post")
                 .font(.caption)
-                .foregroundColor(.tertiaryText)
+                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
         }
     }
 
@@ -331,11 +332,11 @@ struct SmartAIEditorView: View {
 
                     Text("PDF, DOC, or DOCX")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.xl)
-                .background(Color.appBackground)
+                .background(Color.adaptiveBackground(colorScheme))
                 .cornerRadius(CornerRadius.medium)
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.medium)
@@ -348,7 +349,7 @@ struct SmartAIEditorView: View {
 
             Text("AI will transform your CV into a compelling LinkedIn post")
                 .font(.caption)
-                .foregroundColor(.tertiaryText)
+                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 .multilineTextAlignment(.center)
         }
     }
@@ -390,7 +391,7 @@ struct SmartAIEditorView: View {
                 Text("Generated Post")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                 Spacer()
 
@@ -417,7 +418,7 @@ struct SmartAIEditorView: View {
             TextEditor(text: $viewModel.content)
                 .frame(minHeight: 200)
                 .padding(Spacing.md)
-                .background(Color.appBackground)
+                .background(Color.adaptiveBackground(colorScheme))
                 .cornerRadius(CornerRadius.medium)
                 .onChange(of: viewModel.content) { oldValue, newValue in
                     // Recalculate hook score when user edits
@@ -425,7 +426,7 @@ struct SmartAIEditorView: View {
                 }
         }
         .padding(Spacing.lg)
-        .background(Color.appSecondaryBackground)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.large)
     }
 
@@ -437,7 +438,7 @@ struct SmartAIEditorView: View {
                     Text("Hook Score")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
 
                     Text("\(viewModel.hookScore)/100")
                         .font(.title)
@@ -449,7 +450,7 @@ struct SmartAIEditorView: View {
 
                 ZStack {
                     Circle()
-                        .stroke(Color.appBackground, lineWidth: 8)
+                        .stroke(Color.adaptiveBackground(colorScheme), lineWidth: 8)
                         .frame(width: 60, height: 60)
 
                     Circle()
@@ -476,11 +477,11 @@ struct SmartAIEditorView: View {
             // Score description
             Text(hookScoreDescription)
                 .font(.caption)
-                .foregroundColor(.secondaryText)
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(Spacing.lg)
-        .background(Color.appSecondaryBackground)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.large)
     }
 
@@ -511,7 +512,7 @@ struct SmartAIEditorView: View {
 
             Text(suggestion)
                 .font(.callout)
-                .foregroundColor(.primaryText)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Spacing.lg)
@@ -572,7 +573,7 @@ struct SmartAIEditorView: View {
                 .foregroundColor(.appPrimary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Color.appSecondaryBackground)
+                .background(Color.adaptiveSecondaryBackground(colorScheme))
                 .cornerRadius(CornerRadius.medium)
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.medium)
@@ -599,7 +600,7 @@ struct SmartAIEditorView: View {
                     .foregroundColor(.white)
             }
             .padding(Spacing.xl)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.large)
             .shadow(radius: 30)
         }
@@ -626,7 +627,7 @@ struct SmartAIEditorView: View {
                     .foregroundColor(.white.opacity(0.8))
             }
             .padding(Spacing.xxl)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.large)
             .shadow(radius: 30)
         }
