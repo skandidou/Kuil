@@ -240,11 +240,17 @@ class PushNotificationService: NSObject, ObservableObject {
 
     /// Clear badge count
     func clearBadge() {
-        Task { @MainActor in
-            do {
-                try await UNUserNotificationCenter.current().setBadgeCount(0)
-            } catch {
-                print("[Push] Failed to clear badge: \(error)")
+        if #available(iOS 16.0, *) {
+            Task {
+                do {
+                    try await UNUserNotificationCenter.current().setBadgeCount(0)
+                } catch {
+                    print("[Push] Failed to clear badge: \(error)")
+                }
+            }
+        } else {
+            DispatchQueue.main.async {
+                UIApplication.shared.applicationIconBadgeNumber = 0
             }
         }
     }

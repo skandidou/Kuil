@@ -162,7 +162,13 @@ class LinkedInService: NSObject, ObservableObject {
         authContinuation = nil
 
         // Get JWT token for authentication
-        guard let jwt = try? KeychainService.getJWT(), let token = jwt else {
+        let token: String
+        do {
+            guard let jwt = try KeychainService.getJWT() else {
+                throw LinkedInError.invalidCallback
+            }
+            token = jwt
+        } catch {
             throw LinkedInError.invalidCallback
         }
 
