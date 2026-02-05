@@ -12,10 +12,14 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(100), -- User's professional role (Founder, Job Seeker, Creator, etc.)
   persona VARCHAR(100), -- User's communication persona (Visionary, Practitioner, Storyteller)
 
-  -- Encrypted LinkedIn tokens
+  -- Encrypted LinkedIn tokens (OAuth app - for login & posting)
   linkedin_access_token TEXT,
   linkedin_refresh_token TEXT,
   token_expires_at TIMESTAMP,
+
+  -- Encrypted LinkedIn Analytics tokens (Community Management API - for analytics)
+  linkedin_analytics_token TEXT,
+  linkedin_analytics_token_expires_at TIMESTAMP,
 
   -- Metadata
   created_at TIMESTAMP DEFAULT NOW(),
@@ -65,6 +69,11 @@ CREATE TABLE IF NOT EXISTS linkedin_posts (
   shares INT DEFAULT 0,
   impressions INT DEFAULT 0,
 
+  -- Community Management API analytics
+  members_reached INT DEFAULT 0,
+  engagement_rate DECIMAL(5,2) DEFAULT 0.00,
+  analytics_fetched_at TIMESTAMP,
+
   -- Timestamps
   posted_at TIMESTAMP,
   fetched_at TIMESTAMP DEFAULT NOW(),
@@ -72,6 +81,33 @@ CREATE TABLE IF NOT EXISTS linkedin_posts (
 
   -- Prevent duplicates
   UNIQUE(user_id, linkedin_post_id)
+);
+
+-- Analytics Snapshots table (for tracking historical metrics)
+CREATE TABLE IF NOT EXISTS analytics_snapshots (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+
+  -- Follower metrics
+  follower_count INT DEFAULT 0,
+  connection_count INT DEFAULT 0,
+
+  -- Aggregated post metrics
+  total_impressions BIGINT DEFAULT 0,
+  total_members_reached BIGINT DEFAULT 0,
+  total_reactions INT DEFAULT 0,
+  total_comments INT DEFAULT 0,
+  total_reshares INT DEFAULT 0,
+
+  -- Calculated scores
+  visibility_score INT DEFAULT 0,
+  engagement_rate DECIMAL(5,2) DEFAULT 0.00,
+
+  -- Metadata
+  snapshot_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+
+  UNIQUE(user_id, snapshot_date)
 );
 
 -- Generated Posts table (posts created by Gemini)
@@ -123,6 +159,7 @@ CREATE INDEX IF NOT EXISTS idx_generated_posts_user_id ON generated_posts(user_i
 CREATE INDEX IF NOT EXISTS idx_generated_posts_scheduled ON generated_posts(scheduled_at) WHERE status = 'scheduled';
 CREATE INDEX IF NOT EXISTS idx_tone_calibrations_user_id ON tone_calibrations(user_id);
 CREATE INDEX IF NOT EXISTS idx_generated_posts_status ON generated_posts(status);
+CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_user_date ON analytics_snapshots(user_id, snapshot_date DESC);
 
 -- Updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

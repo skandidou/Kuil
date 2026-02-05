@@ -5,6 +5,7 @@ import { AuthService } from '../services/AuthService';
 import { LinkedInService } from '../services/LinkedInService';
 import { CacheService } from '../services/CacheService';
 import { Logger } from '../services/LoggerService';
+import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -207,6 +208,202 @@ router.post('/refresh', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
+
+// ============================================================================
+// LinkedIn Analytics OAuth (Community Management API - separate app)
+// ============================================================================
+
+const ANALYTICS_STATE_PREFIX = 'analytics_oauth_state:';
+
+/**
+ * GET /auth/linkedin-analytics
+ * Initiate LinkedIn OAuth flow for Community Management API (analytics)
+ * Requires user to be already logged in
+ */
+router.get('/linkedin-analytics', authenticate, async (req: AuthRequest, res: Response) => {
+  const correlationId = Logger.generateCorrelationId();
+  const logger = Logger.withContext({ correlationId });
+
+  try {
+    // Check if analytics credentials are configured
+    if (!config.linkedinAnalytics.clientId || !config.linkedinAnalytics.clientSecret) {
+      logger.error('AUTH', 'LinkedIn Analytics credentials not configured');
+      return res.status(500).json({ error: 'Analytics not configured' });
+    }
+
+    const state = AuthService.generateState();
+
+    // Store state with user ID in Redis for callback validation
+    const cacheKey = `${ANALYTICS_STATE_PREFIX}${state}`;
+    await CacheService.set(cacheKey, { userId: req.userId, created: Date.now() }, STATE_EXPIRY_MS);
+
+    logger.info('AUTH', 'Analytics OAuth flow initiated', {
+      userId: req.userId,
+      state: state.substring(0, 8) + '...',
+    });
+
+    // Build redirect URI for analytics callback
+    const redirectUri = config.linkedinAnalytics.redirectUri ||
+      config.linkedin.redirectUri.replace('/callback', '/analytics/callback');
+
+    const authUrl = new URL(config.linkedinAnalytics.authUrl);
+    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('client_id', config.linkedinAnalytics.clientId);
+    authUrl.searchParams.append('redirect_uri', redirectUri);
+    authUrl.searchParams.append('scope', config.linkedinAnalytics.scopes.join(' '));
+    authUrl.searchParams.append('state', state);
+
+    res.redirect(authUrl.toString());
+  } catch (error: any) {
+    logger.error('AUTH', 'Failed to initiate analytics OAuth', {}, error);
+    res.status(500).json({ error: 'Failed to initiate analytics authentication' });
+  }
+});
+
+/**
+ * GET /auth/analytics/callback
+ * LinkedIn OAuth callback for Community Management API
+ */
+router.get('/analytics/callback', async (req: Request, res: Response) => {
+  const correlationId = Logger.generateCorrelationId();
+  const logger = Logger.withContext({ correlationId });
+
+  try {
+    const { code, state, error, error_description } = req.query;
+
+    // Validate OAuth state
+    if (!state || typeof state !== 'string') {
+      logger.warn('AUTH', 'Analytics callback: Missing state parameter');
+      const errorUrl = `${config.frontend.redirectUrl}?analytics_error=invalid_state`;
+      return res.send(generateErrorPage('Invalid request', errorUrl));
+    }
+
+    // Check state in Redis and get user ID
+    const cacheKey = `${ANALYTICS_STATE_PREFIX}${state}`;
+    const stateData = await CacheService.get(cacheKey) as { userId: string; created: number } | null;
+
+    if (!stateData || !stateData.userId) {
+      logger.warn('AUTH', 'Analytics callback: Invalid or expired state', { state: state.substring(0, 8) + '...' });
+      const errorUrl = `${config.frontend.redirectUrl}?analytics_error=invalid_state`;
+      return res.send(generateErrorPage('Session expired. Please try again.', errorUrl));
+    }
+
+    const userId = stateData.userId;
+
+    // State is valid, remove it (one-time use)
+    await CacheService.delete(cacheKey);
+
+    if (error) {
+      logger.error('AUTH', 'LinkedIn Analytics OAuth error', { error, error_description, userId });
+      const errorUrl = `${config.frontend.redirectUrl}?analytics_error=${error}`;
+      return res.send(generateErrorPage('Analytics authentication error', errorUrl));
+    }
+
+    if (!code || typeof code !== 'string') {
+      const errorUrl = `${config.frontend.redirectUrl}?analytics_error=missing_code`;
+      return res.send(generateErrorPage('Missing authorization code', errorUrl));
+    }
+
+    // Build redirect URI (same as in initiation)
+    const redirectUri = config.linkedinAnalytics.redirectUri ||
+      config.linkedin.redirectUri.replace('/callback', '/analytics/callback');
+
+    // Exchange code for access token using Analytics app credentials
+    logger.info('AUTH', 'Exchanging analytics authorization code for access token', { userId });
+
+    const tokenResponse = await fetch(config.linkedinAnalytics.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: config.linkedinAnalytics.clientId,
+        client_secret: config.linkedinAnalytics.clientSecret,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.text();
+      logger.error('AUTH', 'Analytics token exchange failed', { status: tokenResponse.status, error: errorData });
+      const errorUrl = `${config.frontend.redirectUrl}?analytics_error=token_exchange_failed`;
+      return res.send(generateErrorPage('Failed to get analytics access', errorUrl));
+    }
+
+    const tokenData = await tokenResponse.json() as {
+      access_token: string;
+      expires_in: number;
+      refresh_token?: string;
+    };
+
+    logger.info('AUTH', 'Analytics access token received', { userId });
+
+    // Encrypt and store analytics token
+    const encryptedAnalyticsToken = AuthService.encryptToken(tokenData.access_token);
+    const analyticsTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+    await query(
+      `UPDATE users
+       SET linkedin_analytics_token = $1,
+           linkedin_analytics_token_expires_at = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [encryptedAnalyticsToken, analyticsTokenExpiresAt, userId]
+    );
+
+    logger.info('AUTH', 'Analytics token stored successfully', { userId });
+
+    // Redirect back to app with success
+    const successUrl = `${config.frontend.redirectUrl}?analytics_connected=true`;
+    res.redirect(302, successUrl);
+  } catch (error: any) {
+    logger.error('AUTH', 'Analytics OAuth callback error', {
+      message: error.message,
+    }, error);
+
+    const errorUrl = `${config.frontend.redirectUrl}?analytics_error=callback_failed`;
+    res.send(generateErrorPage('An error occurred during analytics authentication', errorUrl));
+  }
+});
+
+/**
+ * GET /auth/analytics/status
+ * Check if user has connected LinkedIn Analytics
+ */
+router.get('/analytics/status', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT linkedin_analytics_token, linkedin_analytics_token_expires_at
+       FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { linkedin_analytics_token, linkedin_analytics_token_expires_at } = result.rows[0];
+
+    const isConnected = !!linkedin_analytics_token;
+    const isExpired = linkedin_analytics_token_expires_at
+      ? new Date(linkedin_analytics_token_expires_at) < new Date()
+      : false;
+
+    res.json({
+      connected: isConnected && !isExpired,
+      expired: isExpired,
+    });
+  } catch (error) {
+    console.error('Analytics status error:', error);
+    res.status(500).json({ error: 'Failed to check analytics status' });
+  }
+});
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
 /**
  * Generate success page HTML - Instant redirect, minimal page

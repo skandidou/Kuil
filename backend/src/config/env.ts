@@ -8,7 +8,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   version: process.env.APP_VERSION || '1.0.0',
 
-  // LinkedIn OAuth
+  // LinkedIn OAuth (for login - uses Sign In with LinkedIn / Share on LinkedIn API)
   linkedin: {
     clientId: process.env.LINKEDIN_CLIENT_ID!,
     clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
@@ -18,6 +18,18 @@ export const config = {
     apiUrl: 'https://api.linkedin.com/v2',
     userInfoUrl: 'https://api.linkedin.com/v2/userinfo',
     scopes: ['openid', 'profile', 'email', 'w_member_social'],
+  },
+
+  // LinkedIn Analytics (Community Management API - separate app for analytics)
+  linkedinAnalytics: {
+    clientId: process.env.LINKEDIN_ANALYTICS_CLIENT_ID || '',
+    clientSecret: process.env.LINKEDIN_ANALYTICS_CLIENT_SECRET || '',
+    redirectUri: process.env.LINKEDIN_ANALYTICS_REDIRECT_URI || `${process.env.LINKEDIN_REDIRECT_URI?.replace('/callback', '/analytics/callback')}`,
+    authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+    tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+    restApiUrl: 'https://api.linkedin.com/rest',
+    apiVersion: '202502', // LinkedIn REST API version (YYYYMM format)
+    scopes: ['r_member_postAnalytics', 'r_member_profileAnalytics', 'r_1st_connections_size'],
   },
 
   // Gemini AI (legacy - kept for fallback)

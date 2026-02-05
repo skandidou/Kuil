@@ -15,6 +15,7 @@ enum APIError: Error, LocalizedError {
     case serverError(Int, String)
     case decodingError(Error)
     case maxRetriesExceeded
+    case scopeUpgradeRequired
 
     var errorDescription: String? {
         switch self {
@@ -32,6 +33,20 @@ enum APIError: Error, LocalizedError {
             return "Failed to process server response"
         case .maxRetriesExceeded:
             return "Request failed after multiple attempts. Please try again."
+        case .scopeUpgradeRequired:
+            return "Please reconnect your LinkedIn account to access new features."
+        }
+    }
+
+    /// Check if this error indicates a scope upgrade is required
+    var isScopeError: Bool {
+        switch self {
+        case .serverError(let code, let message):
+            return code == 403 && message.contains("SCOPE_UPGRADE_REQUIRED")
+        case .scopeUpgradeRequired:
+            return true
+        default:
+            return false
         }
     }
 }
@@ -160,6 +175,12 @@ class APIClient {
             // Check status code
             guard (200...299).contains(httpResponse.statusCode) else {
                 let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+
+                // Check for scope upgrade required error
+                if httpResponse.statusCode == 403 && errorMessage.contains("SCOPE_UPGRADE_REQUIRED") {
+                    throw APIError.scopeUpgradeRequired
+                }
+
                 throw APIError.serverError(httpResponse.statusCode, errorMessage)
             }
 

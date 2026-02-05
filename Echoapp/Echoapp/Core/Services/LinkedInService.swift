@@ -152,6 +152,74 @@ class LinkedInService: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Analytics OAuth (Community Management API)
+
+    /// Connect LinkedIn Analytics (separate OAuth for Community Management API)
+    func connectAnalytics(from window: UIWindow?) async throws -> Bool {
+        // Cancel any existing session
+        authSession?.cancel()
+        authSession = nil
+        authContinuation = nil
+
+        let authURL = URL(string: Config.backendURL + "/auth/linkedin-analytics")!
+
+        return try await withCheckedThrowingContinuation { [weak self] continuation in
+            guard let self = self else {
+                continuation.resume(throwing: LinkedInError.invalidCallback)
+                return
+            }
+
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callbackURLScheme: Config.appURLScheme
+            ) { callbackURL, error in
+                if let error = error {
+                    // User cancelled is not an error
+                    if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+                        continuation.resume(returning: false)
+                        return
+                    }
+                    print("❌ Analytics OAuth error: \(error.localizedDescription)")
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let url = callbackURL,
+                      let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                    continuation.resume(throwing: LinkedInError.invalidCallback)
+                    return
+                }
+
+                // Check for error in callback
+                if let errorParam = components.queryItems?.first(where: { $0.name == "analytics_error" })?.value {
+                    print("❌ Analytics callback error: \(errorParam)")
+                    continuation.resume(throwing: LinkedInError.invalidCallback)
+                    return
+                }
+
+                // Check for success
+                if components.queryItems?.first(where: { $0.name == "analytics_connected" })?.value == "true" {
+                    print("✅ LinkedIn Analytics connected successfully")
+                    continuation.resume(returning: true)
+                    return
+                }
+
+                continuation.resume(returning: false)
+            }
+
+            // Store strong reference
+            self.authSession = session
+
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = true
+
+            if !session.start() {
+                print("❌ Failed to start Analytics OAuth session")
+                continuation.resume(throwing: LinkedInError.invalidCallback)
+            }
+        }
+    }
+
     // MARK: - Profile
 
     /// Fetch user's LinkedIn profile

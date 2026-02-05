@@ -1,36 +1,87 @@
 import { Router, Response } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { query } from '../config/database';
+import { LinkedInAnalyticsService } from '../services/LinkedInAnalyticsService';
 
 const router = Router();
 
 /**
  * GET /api/analytics
- * Get user analytics and stats from LinkedIn posts
+ * Get user analytics - uses LinkedIn Community Management API (separate OAuth app)
  */
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     console.log(`📊 Fetching analytics for user ${req.userId}...`);
 
-    // Get LinkedIn posts stats (primary source of engagement data)
-    const linkedinStatsResult = await query(
-      `SELECT
-        COUNT(*) as total_posts,
-        COALESCE(SUM(likes), 0) as total_likes,
-        COALESCE(SUM(comments), 0) as total_comments,
-        COALESCE(SUM(shares), 0) as total_shares,
-        COALESCE(SUM(impressions), 0) as total_impressions
-       FROM linkedin_posts
-       WHERE user_id = $1`,
+    // Get user's LinkedIn Analytics token (Community Management API)
+    const userResult = await query(
+      `SELECT linkedin_analytics_token, linkedin_analytics_token_expires_at FROM users WHERE id = $1`,
       [req.userId]
     );
 
-    const linkedinStats = linkedinStatsResult.rows[0];
-    const linkedinPostsCount = parseInt(linkedinStats.total_posts || '0', 10);
-    const totalLikes = parseInt(linkedinStats.total_likes || '0', 10);
-    const totalComments = parseInt(linkedinStats.total_comments || '0', 10);
-    const totalShares = parseInt(linkedinStats.total_shares || '0', 10);
-    const totalImpressions = parseInt(linkedinStats.total_impressions || '0', 10);
+    const analyticsToken = userResult.rows[0]?.linkedin_analytics_token;
+    const analyticsTokenExpiry = userResult.rows[0]?.linkedin_analytics_token_expires_at;
+
+    // Check if analytics is connected
+    if (!analyticsToken) {
+      // Return response indicating analytics not connected
+      // Frontend will show "Connect Analytics" button
+      return res.json({
+        analyticsConnected: false,
+        visibilityScore: 0,
+        scoreChange: 0,
+        followerCount: 0,
+        connectionCount: 0,
+        totalImpressions: 0,
+        totalReactions: 0,
+        engagementRate: 0,
+        topPosts: [],
+        message: 'Connect LinkedIn Analytics to see real data',
+      });
+    }
+
+    // Check if token is expired
+    if (analyticsTokenExpiry && new Date(analyticsTokenExpiry) < new Date()) {
+      return res.json({
+        analyticsConnected: false,
+        analyticsExpired: true,
+        visibilityScore: 0,
+        scoreChange: 0,
+        message: 'LinkedIn Analytics token expired. Please reconnect.',
+      });
+    }
+
+    // Check if we have a fresh snapshot (less than 1 hour old)
+    const isFresh = await LinkedInAnalyticsService.isSnapshotFresh(req.userId!);
+
+    let snapshot;
+    if (isFresh) {
+      // Use cached snapshot
+      console.log('📊 Using cached analytics snapshot');
+      snapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+    } else {
+      // Fetch fresh data from LinkedIn API using analytics token
+      console.log('📊 Fetching fresh analytics from LinkedIn API...');
+      try {
+        snapshot = await LinkedInAnalyticsService.fetchAndStoreAnalytics(
+          req.userId!,
+          analyticsToken // Use analytics token, not OAuth token
+        );
+      } catch (error: any) {
+        if (error.message === 'SCOPE_UPGRADE_REQUIRED' || error.message === 'ANALYTICS_NOT_CONNECTED') {
+          return res.json({
+            analyticsConnected: false,
+            visibilityScore: 0,
+            scoreChange: 0,
+            message: 'Please connect LinkedIn Analytics',
+          });
+        }
+        throw error;
+      }
+    }
+
+    // Get score change from previous snapshot
+    const scoreChange = await LinkedInAnalyticsService.getScoreChange(req.userId!);
 
     // Get generated posts count
     const generatedCountResult = await query(
@@ -54,32 +105,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     );
     const avgHookScore = Math.round(parseFloat(hookScoreResult.rows[0]?.avg_score || '0'));
 
-    // Calculate visibility score (0-100) using LinkedIn engagement data
-    let visibilityScore = 0;
-
-    if (linkedinPostsCount >= 1) {
-      // Calculate engagement rate per post
-      const avgLikesPerPost = linkedinPostsCount > 0 ? totalLikes / linkedinPostsCount : 0;
-      const avgCommentsPerPost = linkedinPostsCount > 0 ? totalComments / linkedinPostsCount : 0;
-      const avgSharesPerPost = linkedinPostsCount > 0 ? totalShares / linkedinPostsCount : 0;
-
-      // Weighted score (0-100)
-      const postFrequencyScore = Math.min(linkedinPostsCount * 5, 30);  // Up to 30 points
-      const likesScore = Math.min(avgLikesPerPost * 2, 25);     // Up to 25 points
-      const commentsScore = Math.min(avgCommentsPerPost * 5, 25); // Up to 25 points
-      const sharesScore = Math.min(avgSharesPerPost * 10, 20);  // Up to 20 points
-
-      visibilityScore = Math.min(
-        Math.round(postFrequencyScore + likesScore + commentsScore + sharesScore),
-        100
-      );
-
-      console.log(`📈 Visibility calculation: posts=${linkedinPostsCount}, likes=${totalLikes}, comments=${totalComments}, shares=${totalShares}, score=${visibilityScore}`);
-    } else {
-      console.log(`📊 No LinkedIn posts found - visibility score = 0`);
-    }
-
-    // Get top LinkedIn posts for display
+    // Get top LinkedIn posts for display (from cache)
     const topPostsResult = await query(
       `SELECT
         id,
@@ -87,6 +113,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         likes,
         comments,
         shares,
+        impressions,
         posted_at
        FROM linkedin_posts
        WHERE user_id = $1
@@ -96,32 +123,211 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     );
 
     const analytics = {
-      totalPosts: linkedinPostsCount,
+      // Analytics connection status
+      analyticsConnected: true,
+
+      // Real LinkedIn data from Community Management API
+      visibilityScore: snapshot?.visibilityScore || 0,
+      scoreChange,
+      followerCount: snapshot?.followerCount || 0,
+      connectionCount: snapshot?.connectionCount || 0,
+      totalImpressions: snapshot?.totalImpressions || 0,
+      totalMembersReached: snapshot?.totalMembersReached || 0,
+      totalReactions: snapshot?.totalReactions || 0,
+      totalComments: snapshot?.totalComments || 0,
+      totalReshares: snapshot?.totalReshares || 0,
+      engagementRate: snapshot?.engagementRate || 0,
+
+      // Legacy fields for backwards compatibility
+      totalPosts: topPostsResult.rows.length,
       publishedPosts,
       draftPosts: totalGeneratedPosts - publishedPosts,
-      totalEngagement: totalLikes + totalComments + totalShares,
-      totalLikes,
-      totalComments,
-      totalShares,
-      totalImpressions,
+      totalEngagement: (snapshot?.totalReactions || 0) + (snapshot?.totalComments || 0) + (snapshot?.totalReshares || 0),
+      totalLikes: snapshot?.totalReactions || 0,
+      totalShares: snapshot?.totalReshares || 0,
       avgHookScore,
-      visibilityScore,
-      scoreChange: 0, // TODO: Calculate from previous period
+
+      // Top posts
       topPosts: topPostsResult.rows.map((post) => ({
         id: post.id,
         title: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
         likes: post.likes || 0,
         comments: post.comments || 0,
+        impressions: post.impressions || 0,
         postedAt: post.posted_at,
       })),
+
+      // Metadata
+      lastUpdated: snapshot?.snapshotDate || null,
     };
 
-    console.log(`✅ Analytics fetched: ${linkedinPostsCount} LinkedIn posts, visibility score ${visibilityScore}`);
+    console.log(`✅ Analytics fetched: visibility=${analytics.visibilityScore}, followers=${analytics.followerCount}, impressions=${analytics.totalImpressions}`);
 
     res.json(analytics);
   } catch (error) {
     console.error('Get analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+/**
+ * GET /api/analytics/followers
+ * Get follower statistics and trends
+ */
+router.get('/followers', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    console.log(`👥 Fetching follower analytics for user ${req.userId}...`);
+
+    // Get user's LinkedIn Analytics token
+    const userResult = await query(
+      `SELECT linkedin_analytics_token FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (!userResult.rows[0]?.linkedin_analytics_token) {
+      return res.status(403).json({ error: 'ANALYTICS_NOT_CONNECTED', message: 'Please connect LinkedIn Analytics' });
+    }
+
+    const accessToken = userResult.rows[0].linkedin_analytics_token;
+
+    try {
+      // Get current follower count
+      const followerCount = await LinkedInAnalyticsService.getFollowerCount(accessToken);
+
+      // Get follower trends for the last 30 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      const trends = await LinkedInAnalyticsService.getFollowerTrends(accessToken, startDate, endDate);
+
+      // Calculate change from previous period
+      const previousSnapshot = await query(
+        `SELECT follower_count FROM analytics_snapshots
+         WHERE user_id = $1
+         ORDER BY snapshot_date DESC
+         OFFSET 1 LIMIT 1`,
+        [req.userId]
+      );
+
+      const previousCount = previousSnapshot.rows[0]?.follower_count || followerCount;
+      const change = followerCount - previousCount;
+      const changePercent = previousCount > 0 ? (change / previousCount) * 100 : 0;
+
+      res.json({
+        currentCount: followerCount,
+        previousCount,
+        change,
+        changePercent: Math.round(changePercent * 100) / 100,
+        trends: trends.map((t) => ({
+          date: t.date.toISOString().split('T')[0],
+          count: t.count,
+        })),
+      });
+    } catch (error: any) {
+      if (error.message === 'SCOPE_UPGRADE_REQUIRED') {
+        return res.status(403).json({
+          error: 'SCOPE_UPGRADE_REQUIRED',
+          message: 'Please reconnect your LinkedIn account to access follower analytics',
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Get follower analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch follower analytics' });
+  }
+});
+
+/**
+ * GET /api/analytics/network
+ * Get network size (1st degree connections)
+ */
+router.get('/network', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    console.log(`🔗 Fetching network size for user ${req.userId}...`);
+
+    // Get user's LinkedIn Analytics token
+    const userResult = await query(
+      `SELECT linkedin_analytics_token FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (!userResult.rows[0]?.linkedin_analytics_token) {
+      return res.status(403).json({ error: 'ANALYTICS_NOT_CONNECTED', message: 'Please connect LinkedIn Analytics' });
+    }
+
+    const accessToken = userResult.rows[0].linkedin_analytics_token;
+
+    try {
+      const connectionCount = await LinkedInAnalyticsService.getNetworkSize(accessToken);
+
+      res.json({
+        connectionCount,
+      });
+    } catch (error: any) {
+      if (error.message === 'SCOPE_UPGRADE_REQUIRED') {
+        return res.status(403).json({
+          error: 'SCOPE_UPGRADE_REQUIRED',
+          message: 'Please reconnect your LinkedIn account to access network data',
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Get network size error:', error);
+    res.status(500).json({ error: 'Failed to fetch network size' });
+  }
+});
+
+/**
+ * POST /api/analytics/sync
+ * Force refresh analytics from LinkedIn API
+ */
+router.post('/sync', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    console.log(`🔄 Force syncing analytics for user ${req.userId}...`);
+
+    // Get user's LinkedIn Analytics token
+    const userResult = await query(
+      `SELECT linkedin_analytics_token FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    if (!userResult.rows[0]?.linkedin_analytics_token) {
+      return res.status(403).json({ error: 'ANALYTICS_NOT_CONNECTED', message: 'Please connect LinkedIn Analytics' });
+    }
+
+    const accessToken = userResult.rows[0].linkedin_analytics_token;
+
+    try {
+      const snapshot = await LinkedInAnalyticsService.fetchAndStoreAnalytics(
+        req.userId!,
+        accessToken
+      );
+
+      res.json({
+        success: true,
+        snapshot: {
+          visibilityScore: snapshot.visibilityScore,
+          followerCount: snapshot.followerCount,
+          connectionCount: snapshot.connectionCount,
+          totalImpressions: snapshot.totalImpressions,
+          engagementRate: snapshot.engagementRate,
+          snapshotDate: snapshot.snapshotDate,
+        },
+      });
+    } catch (error: any) {
+      if (error.message === 'SCOPE_UPGRADE_REQUIRED') {
+        return res.status(403).json({
+          error: 'SCOPE_UPGRADE_REQUIRED',
+          message: 'Please reconnect your LinkedIn account to sync analytics',
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Sync analytics error:', error);
+    res.status(500).json({ error: 'Failed to sync analytics' });
   }
 });
 
