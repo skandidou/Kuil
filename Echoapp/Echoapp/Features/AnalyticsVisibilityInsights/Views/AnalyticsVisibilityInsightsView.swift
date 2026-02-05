@@ -52,6 +52,18 @@ struct AnalyticsVisibilityInsightsView: View {
                         .padding(.horizontal, Spacing.md)
                     }
 
+                    // Connect Analytics banner if not connected
+                    if !viewModel.analyticsConnected && !viewModel.isLoading {
+                        ConnectAnalyticsBanner(
+                            isConnecting: viewModel.isConnectingAnalytics,
+                            isExpired: viewModel.analyticsExpired,
+                            onConnect: {
+                                viewModel.connectAnalytics()
+                            }
+                        )
+                        .padding(.horizontal, Spacing.md)
+                    }
+
                     // Visibility Score Section
                     VStack(spacing: Spacing.md) {
                         HStack {

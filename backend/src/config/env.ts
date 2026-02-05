@@ -28,7 +28,7 @@ export const config = {
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     restApiUrl: 'https://api.linkedin.com/rest',
-    apiVersion: '202502', // LinkedIn REST API version (YYYYMM format)
+    apiVersion: '202506', // LinkedIn REST API version - r_member_postAnalytics requires 202506+
     scopes: ['r_member_postAnalytics', 'r_member_profileAnalytics', 'r_1st_connections_size'],
   },
 

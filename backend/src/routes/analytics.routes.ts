@@ -19,50 +19,69 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       [req.userId]
     );
 
-    // LinkedIn Community Management API requires special approval
-    // For now, we'll use data from published posts instead
-    // TODO: Enable when LinkedIn approves the app for member analytics scopes
+    const analyticsToken = userResult.rows[0]?.linkedin_analytics_token;
+    const analyticsTokenExpiry = userResult.rows[0]?.linkedin_analytics_token_expires_at;
 
-    // Get stats from published posts in our database
-    const postsStatsResult = await query(
-      `SELECT
-        COUNT(*) as total_posts,
-        COALESCE(SUM(likes), 0) as total_likes,
-        COALESCE(SUM(comments), 0) as total_comments
-       FROM generated_posts
-       WHERE user_id = $1 AND status = 'published'`,
-      [req.userId]
-    );
-
-    const linkedinPostsResult = await query(
-      `SELECT
-        COUNT(*) as total_posts,
-        COALESCE(SUM(likes), 0) as total_likes,
-        COALESCE(SUM(comments), 0) as total_comments,
-        COALESCE(SUM(shares), 0) as total_shares,
-        COALESCE(SUM(impressions), 0) as total_impressions
-       FROM linkedin_posts
-       WHERE user_id = $1`,
-      [req.userId]
-    );
-
-    const postsStats = postsStatsResult.rows[0];
-    const linkedinStats = linkedinPostsResult.rows[0];
-
-    // Calculate a basic visibility score based on available data
-    const totalPosts = parseInt(postsStats.total_posts || '0') + parseInt(linkedinStats.total_posts || '0');
-    const totalEngagement = parseInt(linkedinStats.total_likes || '0') +
-                           parseInt(linkedinStats.total_comments || '0') +
-                           parseInt(linkedinStats.total_shares || '0');
-    const totalImpressions = parseInt(linkedinStats.total_impressions || '0');
-
-    // Simple visibility score based on posts and engagement
+    // Variables for analytics data
     let visibilityScore = 0;
-    if (totalPosts > 0) {
-      visibilityScore = Math.min(100, totalPosts * 5 + totalEngagement * 2);
+    let scoreChange = 0;
+    let followerCount = 0;
+    let totalImpressions = 0;
+    let totalReactions = 0;
+    let totalComments = 0;
+    let totalReshares = 0;
+    let analyticsConnected = false;
+
+    // Try to get real LinkedIn data if token exists
+    if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
+      analyticsConnected = true;
+      console.log('📊 Fetching real LinkedIn analytics...');
+
+      try {
+        // Fetch data from LinkedIn API
+        const [followers, impressions, reactions, comments, reshares] = await Promise.all([
+          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch(() => 0),
+          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
+        ]);
+
+        followerCount = followers;
+        totalImpressions = impressions;
+        totalReactions = reactions;
+        totalComments = comments;
+        totalReshares = reshares;
+
+        // Calculate visibility score
+        visibilityScore = Math.min(100,
+          Math.round(
+            (followerCount / 100) * 10 +
+            (totalImpressions / 1000) * 25 +
+            (totalReactions / 50) * 15 +
+            (totalComments / 20) * 20 +
+            (totalReshares / 10) * 10
+          )
+        );
+
+        console.log(`✅ LinkedIn data: followers=${followerCount}, impressions=${totalImpressions}, reactions=${totalReactions}`);
+      } catch (error: any) {
+        console.error('❌ LinkedIn API error:', error.message);
+        // Continue with local data fallback
+      }
     }
 
-    const scoreChange = 0; // No historical data yet
+    // Fallback: Get stats from local database
+    const postsStatsResult = await query(
+      `SELECT COUNT(*) as total_posts FROM generated_posts WHERE user_id = $1 AND status = 'published'`,
+      [req.userId]
+    );
+    const localPosts = parseInt(postsStatsResult.rows[0]?.total_posts || '0');
+
+    // If no LinkedIn data, use local posts for basic score
+    if (visibilityScore === 0 && localPosts > 0) {
+      visibilityScore = Math.min(100, localPosts * 5);
+    }
 
     // Get generated posts count
     const generatedCountResult = await query(
@@ -103,30 +122,32 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       [req.userId]
     );
 
-    const analytics = {
-      // Analytics connection status - always true since we use local data
-      analyticsConnected: true,
+    const totalEngagement = totalReactions + totalComments + totalReshares;
 
-      // Calculated from local data
+    const analytics = {
+      // Analytics connection status
+      analyticsConnected,
+
+      // LinkedIn API data (real if connected, 0 otherwise)
       visibilityScore,
       scoreChange,
-      followerCount: 0, // Would need LinkedIn API approval
-      connectionCount: 0, // Would need LinkedIn API approval
+      followerCount,
+      connectionCount: 0,
       totalImpressions,
       totalMembersReached: 0,
-      totalReactions: parseInt(linkedinStats.total_likes || '0'),
-      totalComments: parseInt(linkedinStats.total_comments || '0'),
-      totalReshares: parseInt(linkedinStats.total_shares || '0'),
-      engagementRate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
+      totalReactions,
+      totalComments,
+      totalReshares,
+      engagementRate: totalImpressions > 0 ? Math.round((totalEngagement / totalImpressions) * 100 * 100) / 100 : 0,
 
-      // Post counts
-      totalPosts,
-      publishedPosts: parseInt(postsStats.total_posts || '0'),
-      draftPosts: 0,
+      // Post counts from local DB
+      totalPosts: localPosts,
+      publishedPosts,
+      draftPosts: totalGeneratedPosts - publishedPosts,
       totalEngagement,
-      totalLikes: parseInt(linkedinStats.total_likes || '0'),
-      totalShares: parseInt(linkedinStats.total_shares || '0'),
-      avgHookScore: 0,
+      totalLikes: totalReactions,
+      totalShares: totalReshares,
+      avgHookScore,
 
       // Top posts from linkedin_posts table
       topPosts: topPostsResult.rows.map((post) => ({
@@ -140,10 +161,10 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
       // Metadata
       lastUpdated: new Date().toISOString(),
-      message: totalPosts === 0 ? 'Publiez des posts pour voir vos statistiques' : null,
+      message: !analyticsConnected ? 'Connectez LinkedIn Analytics pour voir vos vraies stats' : (localPosts === 0 ? 'Publiez des posts pour voir vos statistiques' : null),
     };
 
-    console.log(`✅ Analytics fetched: visibility=${visibilityScore}, posts=${totalPosts}, impressions=${totalImpressions}`);
+    console.log(`✅ Analytics fetched: connected=${analyticsConnected}, visibility=${visibilityScore}, followers=${followerCount}, impressions=${totalImpressions}`);
 
     res.json(analytics);
   } catch (error) {
