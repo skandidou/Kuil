@@ -32,6 +32,13 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     let totalReshares = 0;
     let analyticsConnected = false;
 
+    // Get local posts count first (needed for rate limit fallback)
+    const postsStatsResult = await query(
+      `SELECT COUNT(*) as total_posts FROM generated_posts WHERE user_id = $1 AND status = 'published'`,
+      [req.userId]
+    );
+    const localPosts = parseInt(postsStatsResult.rows[0]?.total_posts || '0');
+
     // Try to get real LinkedIn data if token exists
     if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
       console.log('📊 Analytics token found, testing LinkedIn API...');
@@ -40,6 +47,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       try {
         // Fetch data from LinkedIn API with error tracking
         const apiErrors: string[] = [];
+        let isRateLimited = false;
 
         const [followers, impressions, reactions, comments, reshares] = await Promise.all([
           LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch((e) => {
@@ -48,36 +56,78 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
             return 0;
           }),
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch((e) => {
+            if (e.message === 'RATE_LIMITED') isRateLimited = true;
             apiErrors.push(`impressions: ${e.message}`);
             console.error('❌ getImpression failed:', e.message);
-            return 0;
+            return -1; // Use -1 to indicate rate limited
           }),
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch((e) => {
+            if (e.message === 'RATE_LIMITED') isRateLimited = true;
             console.error('❌ getReaction failed:', e.message);
-            return 0;
+            return -1;
           }),
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch((e) => {
+            if (e.message === 'RATE_LIMITED') isRateLimited = true;
             console.error('❌ getComment failed:', e.message);
-            return 0;
+            return -1;
           }),
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch((e) => {
+            if (e.message === 'RATE_LIMITED') isRateLimited = true;
             console.error('❌ getReshare failed:', e.message);
-            return 0;
+            return -1;
           }),
         ]);
 
+        // If rate limited, try to use cached data from latest snapshot
+        if (isRateLimited) {
+          console.log('⚠️ Rate limited by LinkedIn API - using cached data');
+          const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+          if (cachedSnapshot) {
+            console.log('✅ Using cached snapshot from:', cachedSnapshot.snapshotDate);
+            return res.json({
+              analyticsConnected: true,
+              visibilityScore: cachedSnapshot.visibilityScore,
+              scoreChange: 0,
+              followerCount: followers > 0 ? followers : cachedSnapshot.followerCount,
+              connectionCount: cachedSnapshot.connectionCount,
+              totalImpressions: cachedSnapshot.totalImpressions,
+              totalMembersReached: cachedSnapshot.totalMembersReached,
+              totalReactions: cachedSnapshot.totalReactions,
+              totalComments: cachedSnapshot.totalComments,
+              totalReshares: cachedSnapshot.totalReshares,
+              engagementRate: cachedSnapshot.engagementRate,
+              totalPosts: localPosts,
+              publishedPosts: 0,
+              draftPosts: 0,
+              totalEngagement: cachedSnapshot.totalReactions + cachedSnapshot.totalComments + cachedSnapshot.totalReshares,
+              totalLikes: cachedSnapshot.totalReactions,
+              totalShares: cachedSnapshot.totalReshares,
+              avgHookScore: 0,
+              topPosts: [],
+              lastUpdated: cachedSnapshot.snapshotDate.toISOString(),
+              message: 'Using cached data (LinkedIn API rate limited)',
+            });
+          }
+        }
+
         // Only mark as connected if we got SOME data or no critical errors
-        if (apiErrors.length > 0 && followers === 0 && impressions === 0) {
+        // Note: -1 values mean rate limited, treat as 0 for calculation but mark as connected
+        const actualImpressions = impressions < 0 ? 0 : impressions;
+        const actualReactions = reactions < 0 ? 0 : reactions;
+        const actualComments = comments < 0 ? 0 : comments;
+        const actualReshares = reshares < 0 ? 0 : reshares;
+
+        if (apiErrors.length > 0 && followers === 0 && actualImpressions === 0 && !isRateLimited) {
           console.log('⚠️ LinkedIn API calls failed, marking as NOT connected');
           console.log('⚠️ Errors:', apiErrors);
           analyticsConnected = false;
         } else {
           analyticsConnected = true;
           followerCount = followers;
-          totalImpressions = impressions;
-          totalReactions = reactions;
-          totalComments = comments;
-          totalReshares = reshares;
+          totalImpressions = actualImpressions;
+          totalReactions = actualReactions;
+          totalComments = actualComments;
+          totalReshares = actualReshares;
 
           // Calculate visibility score based on project specification:
           // Velocity (40%): Avg engagement (likes + comments*2) - approximated from total engagement / impressions

@@ -26,7 +26,7 @@ const INITIAL_RETRY_DELAY_MS = 1000; // 1 second
 // Model selection - use appropriate model for task complexity
 const CLAUDE_OPUS = config.claude.model; // claude-opus-4-20250514 - for complex personalization
 const CLAUDE_SONNET = 'claude-sonnet-4-20250514'; // For medium complexity tasks
-const CLAUDE_HAIKU = 'claude-3-5-haiku-20241022'; // For simple/fast tasks
+const CLAUDE_HAIKU = 'claude-haiku-4-20250514'; // For simple/fast tasks
 
 /**
  * Execute Claude call with timeout and retry logic

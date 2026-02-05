@@ -203,13 +203,23 @@ export class LinkedInAnalyticsService {
 
       return count;
     } catch (error: any) {
+      const status = error.response?.status;
+      const errorCode = error.response?.data?.code;
+
       console.error(`❌ [LinkedIn] getAggregatedPostAnalytics ${queryType} error:`, {
         message: error.message,
-        status: error.response?.status,
+        status,
         data: error.response?.data,
       });
+
+      // If rate limited (429), throw specific error so caller can use cached data
+      if (status === 429 || errorCode === 'TOO_MANY_REQUESTS') {
+        console.log(`⚠️ [LinkedIn] ${queryType} rate limited - caller should use cached data`);
+        throw new Error('RATE_LIMITED');
+      }
+
       if (error.message === 'SCOPE_UPGRADE_REQUIRED') throw error;
-      return 0; // Return 0 on error, don't fail completely
+      return 0; // Return 0 on other errors
     }
   }
 
