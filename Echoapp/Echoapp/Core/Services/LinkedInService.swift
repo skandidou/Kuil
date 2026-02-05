@@ -125,7 +125,9 @@ class LinkedInService: NSObject, ObservableObject {
             self.authSession = session
 
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
+            // Use ephemeral session to ensure fresh OAuth state each time
+            // This prevents invalid_state errors from cached/stale OAuth requests
+            session.prefersEphemeralWebBrowserSession = true
 
             // Start the session
             if !session.start() {
