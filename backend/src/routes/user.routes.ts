@@ -144,21 +144,32 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
           LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
         ]);
 
-        // Calculate visibility score with balanced logarithmic formula
-        // New users (3 followers, 2K impressions) = ~15-20
-        // Growing creators (500 followers, 50K impressions) = ~50
-        // Established creators (5000+ followers, 500K+ impressions) = ~85-100
-        const followerScore = Math.min(30, Math.log10(Math.max(followers, 1) + 1) * 10);
-        const impressionScore = Math.min(30, Math.log10(Math.max(impressions, 1) + 1) * 8);
-        const reactionScore = Math.min(20, Math.log10(Math.max(reactions, 1) + 1) * 7);
-        const commentScore = Math.min(15, Math.log10(Math.max(comments, 1) + 1) * 8);
-        const reshareScore = Math.min(5, Math.log10(Math.max(reshares, 1) + 1) * 5);
+        // Calculate visibility score based on project specification:
+        // Velocity (40%): Engagement rate (likes + comments*2) / impressions
+        // Network Reach (30%): Viral coefficient (impressions / followers)
+        // Consistency (30%): Posting frequency bonus
+
+        // Velocity Score (40 points max)
+        const engagementRate = impressions > 0
+          ? ((reactions + comments * 2) / impressions) * 100
+          : 0;
+        const velocityScore = Math.min(40, engagementRate * 8);
+
+        // Network Reach Score (30 points max)
+        const viralCoefficient = followers > 0
+          ? impressions / followers
+          : (impressions > 0 ? 10 : 0);
+        const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
+
+        // Consistency Score (30 points max) - base score for having activity
+        const hasActivity = impressions > 0 || reactions > 0;
+        const consistencyScore = hasActivity ? 15 : 0;
 
         visibilityScore = Math.min(100,
-          Math.round(followerScore + impressionScore + reactionScore + commentScore + reshareScore)
+          Math.round(velocityScore + networkReachScore + consistencyScore)
         );
 
-        console.log(`✅ [user/stats] Real LinkedIn visibility score: ${visibilityScore} (followers=${followers}, impressions=${impressions})`);
+        console.log(`✅ [user/stats] Visibility: velocity=${velocityScore.toFixed(1)}/40, reach=${networkReachScore.toFixed(1)}/30, consistency=${consistencyScore}/30 = ${visibilityScore}`);
       } catch (error: any) {
         console.error('❌ [user/stats] LinkedIn API error:', error.message);
         // Fallback to local data calculation
