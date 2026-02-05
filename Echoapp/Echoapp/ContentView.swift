@@ -73,23 +73,9 @@ struct ContentView: View {
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
 
-            } else if appState.isAuthenticated && !appState.hasCompletedProfileSync {
-                // 3. LinkedIn Profile Sync (collect URL for AI voice analysis)
-                LinkedInProfileSyncView(
-                    onComplete: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            appState.hasCompletedProfileSync = true
-                        }
-                    },
-                    onSkip: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            appState.hasCompletedProfileSync = true
-                        }
-                    }
-                )
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-
-            } else if appState.hasCompletedProfileSync && !appState.hasCompletedToneCalibration {
+            } else if appState.isAuthenticated && !appState.hasCompletedToneCalibration {
+                // Skip LinkedIn Profile Sync (we now use API for analytics)
+                // Go directly to Tone Calibration
                 // 4-5. Tone Calibration (12 swipes) + Voice Signature Analysis
                 ToneCalibrationSwipeFlowView(viewModel: toneCalibrationViewModel, isOnboarding: true)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

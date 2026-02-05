@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { config } from './config/env';
-import pool from './config/database';
+import pool, { runMigrations } from './config/database';
 
 // Services
 import { CacheService } from './services/CacheService';
@@ -367,6 +367,10 @@ app.use((err: Error | AppError, req: express.Request, res: express.Response, nex
 async function startServer(): Promise<void> {
   try {
     Logger.info('SERVER', 'Starting Kuil Backend...');
+
+    // 0. Run database migrations
+    Logger.info('SERVER', 'Running database migrations...');
+    await runMigrations();
 
     // 1. Initialize Redis/Cache service
     Logger.info('SERVER', 'Initializing cache service...');

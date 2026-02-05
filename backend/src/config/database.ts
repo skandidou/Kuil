@@ -69,4 +69,55 @@ export const getClient = async () => {
   return client;
 };
 
+/**
+ * Run database migrations
+ * Creates tables/columns if they don't exist
+ */
+export const runMigrations = async () => {
+  console.log('🔄 Running database migrations...');
+
+  try {
+    // Migration 006: Analytics snapshots table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_snapshots (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        follower_count INT DEFAULT 0,
+        connection_count INT DEFAULT 0,
+        total_impressions BIGINT DEFAULT 0,
+        total_members_reached BIGINT DEFAULT 0,
+        total_reactions INT DEFAULT 0,
+        total_comments INT DEFAULT 0,
+        total_reshares INT DEFAULT 0,
+        visibility_score INT DEFAULT 0,
+        engagement_rate DECIMAL(5,2) DEFAULT 0.00,
+        snapshot_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, snapshot_date)
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_user_date
+      ON analytics_snapshots(user_id, snapshot_date DESC)
+    `);
+
+    // Migration 008: LinkedIn Analytics token columns
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS linkedin_analytics_token TEXT
+    `);
+
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS linkedin_analytics_token_expires_at TIMESTAMP
+    `);
+
+    console.log('✅ Database migrations completed');
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    // Don't throw - let the app continue even if migrations fail
+  }
+};
+
 export default pool;
