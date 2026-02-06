@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Combine
 
 // MARK: - API Response Models
 
@@ -138,16 +137,9 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
     @Published var needsReauth: Bool = false
     @Published var lastUpdated: Date?
 
-    private var cancellables = Set<AnyCancellable>()
-
     init() {
-        // Subscribe to AppState for real-time user stats
-        AppState.shared.$userStats
-            .compactMap { $0 }
-            .sink { [weak self] stats in
-                self?.visibilityScore = Double(stats.visibilityScore)
-            }
-            .store(in: &cancellables)
+        // NOTE: visibilityScore is loaded from /api/analytics (fetchAnalytics),
+        // NOT from userStats which uses /api/user/stats (unreliable due to LinkedIn rate limits).
 
         loadAnalytics()
         loadInsights()

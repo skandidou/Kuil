@@ -60,7 +60,6 @@ class MainDashboardViewModel: ObservableObject {
     @Published var bestTime: BestTimeModel?
 
     private var cancellables = Set<AnyCancellable>()
-    private var previousVisibilityScore: Int?
 
     init() {
         // Subscribe to AppState for real user data
@@ -87,21 +86,9 @@ class MainDashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        AppState.shared.$userStats
-            .compactMap { $0 }
-            .sink { [weak self] stats in
-                guard let self = self else { return }
-
-                // Calculate score change if we have a previous score
-                if let previous = self.previousVisibilityScore, previous > 0 {
-                    let change = Double(stats.visibilityScore - previous) / Double(previous) * 100.0
-                    self.scoreChange = change
-                }
-
-                self.previousVisibilityScore = stats.visibilityScore
-                self.visibilityScore = stats.visibilityScore
-            }
-            .store(in: &cancellables)
+        // NOTE: visibilityScore is loaded from /api/analytics (loadScoreChange),
+        // NOT from userStats which uses /api/user/stats (unreliable due to LinkedIn rate limits).
+        // We only use userStats for quickStats (totalPosts, publishedPosts, averageHookScore).
 
         loadData()
     }
