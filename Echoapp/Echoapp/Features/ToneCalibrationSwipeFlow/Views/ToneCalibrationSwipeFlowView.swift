@@ -39,6 +39,11 @@ struct ToneCalibrationSwipeFlowView: View {
                 calibrationView
             }
         }
+        .onAppear {
+            // Only start generating calibration posts when the view actually appears
+            // This prevents wasting an expensive Opus API call if onboarding is already done
+            viewModel.startIfNeeded()
+        }
         .onChange(of: viewModel.isCompleted) { _, newValue in
             if newValue {
                 withAnimation(.appBouncy) {
@@ -372,8 +377,7 @@ struct ToneCalibrationSwipeFlowView: View {
                                 )
                         }
                     )
-                    .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
-                    .shadow(color: Color.appPrimary.opacity(0.2), radius: 20, x: 0, y: 10)
+                    .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                     .offset(dragOffset)
                     .rotationEffect(.degrees(rotation))
                     .opacity(opacity)
@@ -461,88 +465,30 @@ struct ToneCalibrationSwipeFlowView: View {
     }
 
     private func swipeIndicatorView(icon: String, text: String, color: Color, alignment: HorizontalAlignment) -> some View {
-        let dragProgress = min(1.0, Double(abs(dragOffset.width) / 60.0)) // More responsive
-        let indicatorScale = 0.7 + (dragProgress * 0.5) // Scale from 0.7 to 1.2
-        let isLeft = alignment == .leading
+        let dragProgress = min(1.0, Double(abs(dragOffset.width) / 60.0))
+        let indicatorScale = 0.8 + (dragProgress * 0.2)
 
-        return ZStack {
-            // Background blur effect - larger and more visible
-            RoundedRectangle(cornerRadius: 30)
-                .fill(color.opacity(0.2))
-                .blur(radius: 40)
-                .frame(width: 180, height: 180)
+        return VStack(spacing: Spacing.sm) {
+            ZStack {
+                Circle()
+                    .fill(color)
+                    .frame(width: 60, height: 60)
+                    .shadow(color: color.opacity(0.4), radius: 12, x: 0, y: 4)
 
-            // Main container
-            VStack(spacing: Spacing.md) {
-                // Icon with enhanced layered circles
-                ZStack {
-                    // Outer pulsing ring
-                    Circle()
-                        .stroke(color.opacity(0.3), lineWidth: 3)
-                        .frame(width: 110, height: 110)
-                        .scaleEffect(1.0 + (dragProgress * 0.15))
-
-                    // Outer glow circle
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [color.opacity(0.4), color.opacity(0.0)],
-                                center: .center,
-                                startRadius: 25,
-                                endRadius: 60
-                            )
-                        )
-                        .frame(width: 120, height: 120)
-
-                    // Inner filled circle - larger
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.95), color],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 76, height: 76)
-                        .shadow(color: color.opacity(0.5), radius: 16, x: 0, y: 8)
-
-                    // Icon - larger
-                    Image(systemName: icon)
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                // Text with background pill
-                Text(text)
-                    .font(.headline)
-                    .fontWeight(.black)
-                    .foregroundColor(color)
-                    .tracking(2)
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.xs)
-                    .background(
-                        Capsule()
-                            .fill(color.opacity(0.15))
-                    )
-
-                // Directional arrow
-                HStack(spacing: 4) {
-                    if isLeft {
-                        Image(systemName: "arrow.left")
-                        Text("Swipe")
-                    } else {
-                        Text("Swipe")
-                        Image(systemName: "arrow.right")
-                    }
-                }
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(color.opacity(0.7))
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
             }
+
+            Text(text)
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+                .tracking(1.5)
         }
         .opacity(dragProgress)
         .scaleEffect(indicatorScale)
-        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: dragOffset.width)
+        .animation(.appQuick, value: dragOffset.width)
     }
 
     // MARK: - Action Buttons
@@ -552,11 +498,11 @@ struct ToneCalibrationSwipeFlowView: View {
             Button(action: skipAction) {
                 ZStack {
                     Circle()
-                        .fill(Color.errorRed.opacity(0.15))
-                        .frame(width: 70, height: 70)
+                        .fill(Color.errorRed.opacity(0.12))
+                        .frame(width: 60, height: 60)
 
                     Image(systemName: "xmark")
-                        .font(.title2)
+                        .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.errorRed)
                 }
@@ -571,10 +517,10 @@ struct ToneCalibrationSwipeFlowView: View {
                     ZStack {
                         Circle()
                             .fill(Color.adaptiveSecondaryBackground(colorScheme))
-                            .frame(width: 55, height: 55)
+                            .frame(width: 44, height: 44)
 
                         Image(systemName: "info.circle")
-                            .font(.title3)
+                            .font(.callout)
                             .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     }
                 }
@@ -587,18 +533,12 @@ struct ToneCalibrationSwipeFlowView: View {
             Button(action: acceptAction) {
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.appPrimary, Color.accentCyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 70, height: 70)
-                        .shadow(color: Color.appPrimary.opacity(0.5), radius: 15)
+                        .fill(Color.appPrimary)
+                        .frame(width: 60, height: 60)
+                        .shadow(color: Color.appPrimary.opacity(0.3), radius: 12)
 
                     Image(systemName: "checkmark")
-                        .font(.title2)
+                        .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                 }
@@ -731,8 +671,9 @@ struct ToneCalibrationSwipeFlowView: View {
 struct ModernButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.appQuick, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.appSubtle, value: configuration.isPressed)
     }
 }
 

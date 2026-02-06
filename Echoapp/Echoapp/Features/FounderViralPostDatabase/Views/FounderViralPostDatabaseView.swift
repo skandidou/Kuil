@@ -8,13 +8,14 @@
 import SwiftUI
 
 struct FounderViralPostDatabaseView: View {
+    @Environment(\.colorScheme) var colorScheme
     @ObservedObject var viewModel: FounderViralPostDatabaseViewModel
     @State private var searchText: String = ""
     @State private var selectedCategory: String = "All"
     
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -24,14 +25,14 @@ struct FounderViralPostDatabaseView: View {
                         viewModel.back()
                     }) {
                         Image(systemName: "arrow.left")
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .font(.headline)
                     }
                     
                     VStack(spacing: 4) {
                         Text("Viral Database")
                             .font(.headline)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         BadgeView("FOUNDER TIER", color: .appPrimary)
                     }
@@ -51,15 +52,15 @@ struct FounderViralPostDatabaseView: View {
                 // Search Bar
                 HStack(spacing: Spacing.md) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .font(.callout)
                     
                     TextField("Search industries or keywords...", text: $searchText)
                         .font(.body)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 }
                 .padding(Spacing.md)
-                .background(Color.appSecondaryBackground)
+                .background(Color.adaptiveSecondaryBackground(colorScheme))
                 .cornerRadius(CornerRadius.medium)
                 .padding(.horizontal, Spacing.md)
                 .padding(.top, Spacing.md)
@@ -73,10 +74,10 @@ struct FounderViralPostDatabaseView: View {
                             }) {
                                 Text(category)
                                     .font(.headline)
-                                    .foregroundColor(selectedCategory == category ? .white : .secondaryText)
+                                    .foregroundColor(selectedCategory == category ? .white : Color.adaptiveSecondaryText(colorScheme))
                                     .padding(.horizontal, Spacing.lg)
                                     .padding(.vertical, Spacing.sm)
-                                    .background(selectedCategory == category ? Color.appPrimary : Color.appSecondaryBackground)
+                                    .background(selectedCategory == category ? Color.appPrimary : Color.adaptiveSecondaryBackground(colorScheme))
                                     .cornerRadius(CornerRadius.large)
                             }
                         }
@@ -90,7 +91,7 @@ struct FounderViralPostDatabaseView: View {
                     Text("Trending Hook Patterns")
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     Spacer()
                     
@@ -122,6 +123,7 @@ struct FounderViralPostDatabaseView: View {
 }
 
 struct HookPatternCard: View {
+    @Environment(\.colorScheme) var colorScheme
     let pattern: HookPatternModel
     
     var body: some View {
@@ -140,11 +142,11 @@ struct HookPatternCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pattern.authorName)
                         .font(.headline)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     Text(pattern.metrics)
                         .font(.caption)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 }
                 
                 Spacer()
@@ -153,7 +155,7 @@ struct HookPatternCard: View {
                     pattern.bookmarkAction?()
                 }) {
                     Image(systemName: pattern.isBookmarked ? "bookmark.fill" : "bookmark")
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .font(.callout)
                 }
             }
@@ -162,7 +164,7 @@ struct HookPatternCard: View {
             Text("\"\(pattern.quote)\"")
                 .font(.body)
                 .italic()
-                .foregroundColor(.primaryText)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 .lineSpacing(4)
             
             // AI Analysis
@@ -179,7 +181,7 @@ struct HookPatternCard: View {
                 
                 Text(pattern.analysis)
                     .font(.body)
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
             
             // Action Button
@@ -188,7 +190,7 @@ struct HookPatternCard: View {
             }
         }
         .padding(Spacing.lg)
-        .background(Color.appSecondaryBackground)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.medium)
     }
 }

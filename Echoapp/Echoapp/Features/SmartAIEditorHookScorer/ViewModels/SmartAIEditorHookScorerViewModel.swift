@@ -14,6 +14,8 @@ struct SinglePostResponse: Codable {
     let content: String
     let hookScore: Int
     let suggestions: [String]
+    let calibratedHookScore: Int?
+    let sessionId: String?
 }
 
 struct SchedulePostResponse: Codable {
@@ -25,7 +27,9 @@ struct SchedulePostResponse: Codable {
 class SmartAIEditorHookScorerViewModel: ObservableObject {
     @Published var content: String = ""
     @Published var hookScore: Int = 0
+    @Published var calibratedHookScore: Int? = nil
     @Published var aiSuggestion: String? = nil
+    @Published var allSuggestions: [String] = []
     @Published var isGenerating: Bool = false
     @Published var isSaving: Bool = false
     @Published var isCalculatingScore: Bool = false
@@ -50,8 +54,13 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
     // Debounce timer for hook score calculation
     private var hookScoreDebounceTask: Task<Void, Never>?
 
+    // Cached success patterns for adaptive local scoring
+    private var cachedPatterns: [String: Double] = [:] // type -> successRate
+
     init(sourceType: String = "From Idea") {
         self.sourceType = sourceType
+        // Use centralized patterns from AppState (no duplicate API call)
+        self.cachedPatterns = AppState.shared.successPatterns
     }
 
     func generateContent(from prompt: String) {
@@ -64,7 +73,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         isGenerating = true
 
         do {
-            print("🤖 Generating post content with Gemini...")
+            print("🤖 Generating post content with enhanced AI...")
 
             // Build request body with personalization
             var body: [String: Any] = [
@@ -78,26 +87,49 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
 
             print("🎯 Generating with personalization: \(personalization.debugDescription)")
 
-            // Call backend to generate post with AI
+            // Use enhanced endpoint for calibrated scoring
             let response: SinglePostResponse = try await APIClient.shared.post(
-                endpoint: "/api/voice/generate",
+                endpoint: "/api/voice/generate-enhanced",
                 body: body
             )
 
             await MainActor.run {
                 self.content = response.content
                 self.hookScore = response.hookScore
+                self.calibratedHookScore = response.calibratedHookScore
+                self.allSuggestions = response.suggestions
                 if !response.suggestions.isEmpty {
                     self.aiSuggestion = "AI Suggestion: \(response.suggestions.first!)"
                 }
             }
 
-            print("✅ Post generated with hook score: \(response.hookScore)")
+            print("✅ Post generated with hook score: \(response.hookScore), calibrated: \(response.calibratedHookScore ?? response.hookScore)")
         } catch {
-            print("❌ Failed to generate post: \(error)")
-            await MainActor.run {
-                self.content = "Start writing your post here..."
-                self.hookScore = 0
+            // Fallback to standard endpoint if enhanced not available
+            print("⚠️ Enhanced generation failed, falling back to standard: \(error)")
+            do {
+                var body: [String: Any] = ["prompt": prompt, "sourceType": sourceType]
+                let personalization = PersonalizationContext.current()
+                body.merge(personalization.toDictionary()) { _, new in new }
+
+                let response: SinglePostResponse = try await APIClient.shared.post(
+                    endpoint: "/api/voice/generate",
+                    body: body
+                )
+                await MainActor.run {
+                    self.content = response.content
+                    self.hookScore = response.hookScore
+                    self.allSuggestions = response.suggestions
+                    if !response.suggestions.isEmpty {
+                        self.aiSuggestion = "AI Suggestion: \(response.suggestions.first!)"
+                    }
+                }
+            } catch {
+                print("❌ Failed to generate post: \(error)")
+                await MainActor.run {
+                    self.content = "Start writing your post here..."
+                    self.hookScore = 0
+                }
             }
         }
 
@@ -145,12 +177,16 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
             score -= 10
         }
 
-        // 2. Strong opening detection
+        // 2. Strong opening detection (adapted by success patterns)
         var hasStrongOpening = false
+
+        // Hook style bonus - adapt based on user's proven patterns
+        let questionBonus = patternBonus(type: "hook_style", value: "question", base: 15)
+        let statementBonus = patternBonus(type: "hook_style", value: "statement", base: 10)
 
         // Questions are engaging
         if firstLine.contains("?") {
-            score += 15
+            score += questionBonus
             hasStrongOpening = true
         }
 
@@ -160,7 +196,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
            lowercasedFirstLine.starts(with: "here's ") ||
            lowercasedFirstLine.starts(with: "ever ") ||
            lowercasedFirstLine.starts(with: "what if ") {
-            score += 10
+            score += statementBonus
             hasStrongOpening = true
         }
 
@@ -181,6 +217,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         score += min(powerWordCount * 6, 12) // Reduced max bonus
 
         // 5. Call to action (required for engagement)
+        let ctaBonus = patternBonus(type: "cta_style", value: "question", base: 12)
         let hasCTA = lowercasedText.contains("agree") ||
                      lowercasedText.contains("thoughts") ||
                      lowercasedText.contains("comment") ||
@@ -188,18 +225,26 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                      lowercasedText.contains("what do you think") ||
                      lowercasedText.hasSuffix("?")
         if hasCTA {
-            score += 12
+            score += ctaBonus
         } else {
             score -= 10 // Penalty for no engagement signal
         }
 
-        // 6. Emoji usage (moderate is good)
+        // 6. Emoji usage (adapted by success patterns)
         let emojiPattern = try? NSRegularExpression(pattern: "[\\p{Emoji}]")
         let emojiCount = emojiPattern?.numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text)) ?? 0
+        let emojiSuccessRate = cachedPatterns["emoji_usage"] ?? 0
+        let emojiBaseBonus = emojiSuccessRate > 0.6 ? 8 : 5
         if emojiCount >= 1 && emojiCount <= 3 {
-            score += 5
+            score += emojiBaseBonus
         } else if emojiCount > 5 {
             score -= 5
+        }
+
+        // 6b. Numbered list / structure bonus (adapted by success patterns)
+        let hasNumberedList = text.contains("1.") || text.contains("1)") || text.contains("→")
+        if hasNumberedList {
+            score += patternBonus(type: "structure", value: "numbered_list", base: 5)
         }
 
         // 7. Persona-specific bonuses (adaptive scoring)
@@ -241,7 +286,21 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         return min(max(score, 10), 100) // Clamp between 10-100
     }
 
-    /// Generate suggestion based on local analysis
+    /// Calculate adaptive bonus based on user's success patterns
+    private func patternBonus(type: String, value: String, base: Int) -> Int {
+        // Check for specific type:value match first
+        if let rate = cachedPatterns["\(type):\(value.lowercased())"] {
+            // Scale: 0.5 rate = base, 0.8+ rate = base * 1.5
+            return Int(Double(base) * (0.5 + rate))
+        }
+        // Check for general type-level pattern
+        if let rate = cachedPatterns[type], rate > 0.5 {
+            return Int(Double(base) * (0.5 + rate * 0.5))
+        }
+        return base
+    }
+
+    /// Generate suggestion based on local analysis + user's success patterns
     private func generateLocalSuggestion(_ text: String, score: Int) -> String? {
         guard !text.isEmpty else { return nil }
 
@@ -252,11 +311,19 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
             if wordCount < 30 {
                 return "AI Suggestion: Your post is quite short. Add more context to engage readers."
             }
+            // Suggest based on user's best performing hook style
+            if let questionRate = cachedPatterns["hook_style:question"], questionRate > 0.6 {
+                return "AI Suggestion: Your best posts start with questions — try opening with one!"
+            }
             if !firstLine.contains("?") && !firstLine.lowercased().contains("i ") {
                 return "AI Suggestion: Start with a question or personal statement to hook readers."
             }
             return "AI Suggestion: Try adding a compelling question or bold statement at the start."
         } else if score < 70 {
+            // Suggest based on user's patterns
+            if let listRate = cachedPatterns["structure:numbered_list"], listRate > 0.5, !text.contains("1.") {
+                return "AI Suggestion: Your best posts use numbered lists — try adding one for structure!"
+            }
             if !text.contains("\n\n") {
                 return "AI Suggestion: Break up your text with line breaks for better readability."
             }
@@ -432,6 +499,8 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
             await MainActor.run {
                 self.content = response.content
                 self.hookScore = response.hookScore
+                self.calibratedHookScore = response.calibratedHookScore
+                self.allSuggestions = response.suggestions
                 if !response.suggestions.isEmpty {
                     self.aiSuggestion = "AI Suggestion: \(response.suggestions.first!)"
                 }

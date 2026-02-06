@@ -24,15 +24,66 @@ class AppState: ObservableObject {
     // User profile data
     @Published var userProfile: UserProfileResponse?
     @Published var userStats: UserStatsResponse?
+    @Published var selectedTopics: [String] = []
+
+    // Centralized success patterns cache (prevents 7+ duplicate API calls)
+    @Published var successPatterns: [String: Double] = [:]
+    private var successPatternsLastFetched: Date?
 
     // Color scheme preference (stored in UserDefaults)
     @Published var colorScheme: ColorScheme?
 
     static let shared = AppState()
 
+    // UserDefaults keys for onboarding persistence
+    private enum Keys {
+        static let isAuthenticated = "onboarding_isAuthenticated"
+        static let hasCompletedOnboarding = "onboarding_hasCompletedOnboarding"
+        static let hasCompletedToneCalibration = "onboarding_hasCompletedToneCalibration"
+        static let hasSelectedTopics = "onboarding_hasSelectedTopics"
+        static let hasSeenProfilescope = "onboarding_hasSeenProfilescope"
+    }
+
     private init() {
         // Load color scheme from UserDefaults
         loadColorScheme()
+        // Restore onboarding state from UserDefaults
+        restoreOnboardingState()
+    }
+
+    /// Restore onboarding flags from UserDefaults (fast, synchronous)
+    private func restoreOnboardingState() {
+        let defaults = UserDefaults.standard
+
+        // Only restore if we have a JWT (user was authenticated before)
+        guard KeychainService.hasJWT() else {
+            print("🔑 No JWT found, starting fresh onboarding")
+            return
+        }
+
+        isAuthenticated = defaults.bool(forKey: Keys.isAuthenticated)
+        hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        hasCompletedToneCalibration = defaults.bool(forKey: Keys.hasCompletedToneCalibration)
+        hasSelectedTopics = defaults.bool(forKey: Keys.hasSelectedTopics)
+        hasSeenProfilescope = defaults.bool(forKey: Keys.hasSeenProfilescope)
+
+        if hasCompletedOnboarding {
+            print("✅ Onboarding state restored from UserDefaults — skipping setup")
+            // Also reload user data in background
+            Task { await loadUserData() }
+        } else if isAuthenticated {
+            print("🔄 Partial onboarding state restored — resuming from where user left off")
+        }
+    }
+
+    /// Persist all onboarding flags to UserDefaults
+    func saveOnboardingProgress() {
+        let defaults = UserDefaults.standard
+        defaults.set(isAuthenticated, forKey: Keys.isAuthenticated)
+        defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding)
+        defaults.set(hasCompletedToneCalibration, forKey: Keys.hasCompletedToneCalibration)
+        defaults.set(hasSelectedTopics, forKey: Keys.hasSelectedTopics)
+        defaults.set(hasSeenProfilescope, forKey: Keys.hasSeenProfilescope)
     }
 
     private func loadColorScheme() {
@@ -67,6 +118,9 @@ class AppState: ObservableObject {
             let profile = try await UserService.shared.fetchProfile()
             await MainActor.run {
                 self.userProfile = profile
+                if let topics = profile.topicPreferences, !topics.isEmpty {
+                    self.selectedTopics = topics
+                }
             }
             print("✅ User profile loaded: \(profile.name)")
 
@@ -77,8 +131,48 @@ class AppState: ObservableObject {
             }
             print("✅ User stats loaded: visibility \(stats.visibilityScore)")
 
+            // Also load success patterns centrally
+            await loadSuccessPatternsIfNeeded()
+
         } catch {
             print("❌ Failed to load user data: \(error)")
+        }
+    }
+
+    /// Load success patterns once and cache for 30 minutes
+    func loadSuccessPatternsIfNeeded() async {
+        // Skip if fetched within last 30 minutes
+        if let lastFetched = successPatternsLastFetched,
+           Date().timeIntervalSince(lastFetched) < 1800 {
+            return
+        }
+
+        do {
+            struct PatternsResponse: Codable {
+                let patterns: [PatternData]
+            }
+            struct PatternData: Codable {
+                let type: String
+                let value: String
+                let successRate: Double
+            }
+
+            let response: PatternsResponse = try await APIClient.shared.get(
+                endpoint: "/api/voice/success-patterns",
+                requiresAuth: true
+            )
+
+            var map: [String: Double] = [:]
+            for p in response.patterns {
+                map["\(p.type):\(p.value.lowercased())"] = p.successRate
+                map[p.type] = max(map[p.type] ?? 0, p.successRate)
+            }
+
+            self.successPatterns = map
+            self.successPatternsLastFetched = Date()
+            print("✅ Success patterns loaded centrally: \(response.patterns.count) patterns")
+        } catch {
+            print("⚠️ Could not load success patterns: \(error)")
         }
     }
 
@@ -98,6 +192,17 @@ class AppState: ObservableObject {
         // Clear user data
         userProfile = nil
         userStats = nil
+        selectedTopics = []
+        successPatterns = [:]
+        successPatternsLastFetched = nil
+
+        // Clear persisted onboarding flags
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: Keys.isAuthenticated)
+        defaults.removeObject(forKey: Keys.hasCompletedOnboarding)
+        defaults.removeObject(forKey: Keys.hasCompletedToneCalibration)
+        defaults.removeObject(forKey: Keys.hasSelectedTopics)
+        defaults.removeObject(forKey: Keys.hasSeenProfilescope)
 
         // Reset navigation
         selectedTab = .home

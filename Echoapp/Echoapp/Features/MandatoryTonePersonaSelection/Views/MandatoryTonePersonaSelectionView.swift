@@ -9,10 +9,11 @@ import SwiftUI
 
 struct MandatoryTonePersonaSelectionView: View {
     @ObservedObject var viewModel: MandatoryTonePersonaSelectionViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -20,12 +21,12 @@ struct MandatoryTonePersonaSelectionView: View {
                 HStack {
                     Text("ONBOARDING")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Text("Step 1 of 3")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.top, Spacing.md)
@@ -34,7 +35,7 @@ struct MandatoryTonePersonaSelectionView: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color.appSecondaryBackground)
+                            .fill(Color.adaptiveSecondaryBackground(colorScheme))
                             .frame(height: 4)
                         
                         Rectangle()
@@ -53,11 +54,11 @@ struct MandatoryTonePersonaSelectionView: View {
                             Text("Define Your Voice")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             
                             Text("Select the persona that best matches your unique writing style on LinkedIn.")
                                 .font(.body)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, Spacing.lg)
                         }
@@ -86,7 +87,7 @@ struct MandatoryTonePersonaSelectionView: View {
                         // Footer
                         Text("You can refine your tone later in Profile Settings.")
                             .font(.caption)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                             .padding(.top, Spacing.md)
                             .padding(.bottom, Spacing.xl)
                     }
@@ -100,7 +101,8 @@ struct PersonaCard: View {
     let persona: Persona
     let isSelected: Bool
     let action: () -> Void
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: Spacing.md) {
@@ -129,11 +131,11 @@ struct PersonaCard: View {
                         Text(persona.title)
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         Text(persona.description)
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     }
                     
                     Spacer()
@@ -143,10 +145,10 @@ struct PersonaCard: View {
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(persona.exampleQuote)
                         .font(.callout)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .italic()
                         .padding(Spacing.md)
-                        .background(Color.appBackground)
+                        .background(Color.adaptiveBackground(colorScheme))
                         .cornerRadius(CornerRadius.small)
                 }
                 
@@ -161,7 +163,7 @@ struct PersonaCard: View {
                 }
             }
             .padding(Spacing.lg)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.medium)

@@ -8,6 +8,28 @@
 import SwiftUI
 import Combine
 
+// MARK: - Models for profile enrichment
+
+struct VoiceEvolutionEntry: Identifiable, Codable {
+    var id: String { createdAt }
+    let formal: Double
+    let bold: Double
+    let empathetic: Double
+    let complexity: Double
+    let brevity: Double
+    let primaryTone: String
+    let triggerReason: String?
+    let createdAt: String
+}
+
+struct UserSuccessPattern: Identifiable {
+    let id = UUID()
+    let type: String
+    let value: String
+    let successRate: Double
+    let avgEngagement: Double
+}
+
 @MainActor
 class UserProfileVoiceSettingsViewModel: ObservableObject {
     @Published var userName: String = "Loading..."
@@ -18,6 +40,18 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
 
     // Voice signature data for radar chart (values from 0-10)
     @Published var voiceSignature: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+    // Voice metadata
+    @Published var postsAnalyzed: Int = 0
+    @Published var lastAnalyzedAt: String?
+    @Published var confidence: Double = 0.0
+    @Published var confidenceLabel: String = ""
+
+    // Evolution history
+    @Published var evolutionHistory: [VoiceEvolutionEntry] = []
+
+    // Success patterns
+    @Published var successPatterns: [UserSuccessPattern] = []
 
     // Settings
     @Published var pushNotificationsEnabled: Bool = true
@@ -49,6 +83,10 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                         signature.brevity
                     ]
                     self?.primaryTone = signature.primaryTone
+                    self?.postsAnalyzed = signature.postsAnalyzed ?? 0
+                    self?.lastAnalyzedAt = signature.lastAnalyzedAt
+                    self?.confidence = signature.confidence
+                    self?.confidenceLabel = self?.confidenceLabelFor(signature.confidence) ?? ""
                 } else {
                     // No voice signature yet - load it from backend
                     self?.loadVoiceSignature()
@@ -71,6 +109,67 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
         } else {
             // Profile exists but maybe no voice signature
             loadVoiceSignature()
+        }
+
+        // Load additional data
+        Task { await loadEvolutionHistory() }
+        Task { await loadSuccessPatterns() }
+    }
+
+    private func confidenceLabelFor(_ value: Double) -> String {
+        if value >= 0.8 { return "High" }
+        if value >= 0.5 { return "Medium" }
+        return "Low"
+    }
+
+    func loadEvolutionHistory() async {
+        do {
+            struct EvolutionResponse: Codable {
+                let history: [VoiceEvolutionEntry]
+            }
+
+            let response: EvolutionResponse = try await APIClient.shared.get(
+                endpoint: "/api/voice/evolution-history",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                self.evolutionHistory = Array(response.history.prefix(5))
+            }
+        } catch {
+            print("Failed to load evolution history: \(error)")
+        }
+    }
+
+    func loadSuccessPatterns() async {
+        do {
+            struct PatternsResponse: Codable {
+                let patterns: [PatternItem]
+            }
+            struct PatternItem: Codable {
+                let type: String
+                let value: String
+                let successRate: Double
+                let avgEngagement: Double?
+            }
+
+            let response: PatternsResponse = try await APIClient.shared.get(
+                endpoint: "/api/voice/success-patterns",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                self.successPatterns = response.patterns.prefix(5).map {
+                    UserSuccessPattern(
+                        type: $0.type,
+                        value: $0.value,
+                        successRate: $0.successRate,
+                        avgEngagement: $0.avgEngagement ?? 0
+                    )
+                }
+            }
+        } catch {
+            print("Failed to load success patterns: \(error)")
         }
     }
 
@@ -116,8 +215,12 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     }
 
     func showSettings() {
-        // Settings view is already shown
+        // Settings view is already the current view
     }
+
+    @Published var showInfoAlert = false
+    @Published var infoAlertTitle: String = ""
+    @Published var infoAlertMessage: String = ""
 
     func togglePushNotifications() {
         pushNotificationsEnabled.toggle()
@@ -126,13 +229,15 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     }
 
     func showAccountStatus() {
-        // Show account status details
-        print("ℹ️ Account status: \(accountStatus)")
+        infoAlertTitle = "Account Status"
+        infoAlertMessage = "Your LinkedIn account is \(accountStatus). Kuil syncs your profile data to personalize AI-generated content."
+        showInfoAlert = true
     }
 
     func showDataPrivacy() {
-        // Show data privacy settings
-        print("🔒 Opening data privacy settings...")
+        infoAlertTitle = "Data Privacy"
+        infoAlertMessage = "Kuil uses your LinkedIn data solely to generate personalized content. Your data is encrypted and never shared with third parties. You can revoke access at any time by disconnecting your LinkedIn account."
+        showInfoAlert = true
     }
 
     func reanalyzeProfile() {
@@ -171,11 +276,9 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     }
 
     func manageSubscription() {
-        // Handle subscription
-    }
-
-    func openReferral() {
-        NotificationCenter.default.post(name: .openReferralProgram, object: nil)
+        infoAlertTitle = "Subscription"
+        infoAlertMessage = "Subscription management is coming in a future update."
+        showInfoAlert = true
     }
 
     func signOut() {

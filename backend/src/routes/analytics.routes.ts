@@ -6,6 +6,75 @@ import { LinkedInAnalyticsService } from '../services/LinkedInAnalyticsService';
 const router = Router();
 
 /**
+ * Update linkedin_posts with real per-post analytics from Community Management API
+ * This enriches the basic post data with real impressions, reactions, etc.
+ */
+async function updatePostAnalyticsFromCMA(userId: string, analyticsToken: string): Promise<void> {
+  try {
+    // Get linkedin_posts that need analytics update (no analytics_fetched_at or older than 1 hour)
+    const postsResult = await query(
+      `SELECT id, linkedin_post_id FROM linkedin_posts
+       WHERE user_id = $1 AND linkedin_post_id IS NOT NULL
+       AND (analytics_fetched_at IS NULL OR analytics_fetched_at < NOW() - INTERVAL '1 hour')
+       ORDER BY posted_at DESC
+       LIMIT 20`,
+      [userId]
+    );
+
+    if (postsResult.rows.length === 0) {
+      console.log('📊 All linkedin_posts already have fresh analytics');
+      return;
+    }
+
+    console.log(`📊 Updating analytics for ${postsResult.rows.length} LinkedIn posts...`);
+
+    // Fetch analytics for each post (in parallel, batches of 5 to avoid rate limits)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < postsResult.rows.length; i += BATCH_SIZE) {
+      const batch = postsResult.rows.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(batch.map(async (post) => {
+        try {
+          const analytics = await LinkedInAnalyticsService.getPostAnalytics(
+            analyticsToken,
+            post.linkedin_post_id
+          );
+
+          // Update the post with real analytics data
+          await query(
+            `UPDATE linkedin_posts SET
+              impressions = $1,
+              likes = GREATEST(likes, $2),
+              comments = GREATEST(comments, $3),
+              shares = GREATEST(shares, $4),
+              members_reached = $5,
+              engagement_rate = $6,
+              analytics_fetched_at = NOW()
+            WHERE id = $7`,
+            [
+              analytics.impressions,
+              analytics.reactions,
+              analytics.comments,
+              analytics.reshares,
+              analytics.membersReached,
+              analytics.engagementRate,
+              post.id,
+            ]
+          );
+        } catch (err: any) {
+          console.error(`⚠️ Failed to fetch analytics for post ${post.linkedin_post_id}:`, err.message);
+        }
+      }));
+    }
+
+    console.log(`✅ Updated analytics for linkedin_posts`);
+  } catch (error: any) {
+    console.error('⚠️ updatePostAnalyticsFromCMA error:', error.message);
+    // Non-critical — don't throw
+  }
+}
+
+/**
  * GET /api/analytics
  * Get user analytics - uses LinkedIn Community Management API (separate OAuth app)
  * CACHING: Data is fetched from LinkedIn API at most once per hour to avoid rate limits
@@ -112,6 +181,15 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
             const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
             if (cachedSnapshot) {
               console.log('✅ Using cached snapshot from:', cachedSnapshot.snapshotDate);
+
+              // Fetch top posts from linkedin_posts (real LinkedIn posts ranked by impressions)
+              const cachedTopPostsResult = await query(
+                `SELECT id, content, likes, comments, shares, impressions, posted_at
+                 FROM linkedin_posts WHERE user_id = $1
+                 ORDER BY impressions DESC LIMIT 10`,
+                [req.userId]
+              );
+
               return res.json({
                 analyticsConnected: true,
                 visibilityScore: cachedSnapshot.visibilityScore,
@@ -131,7 +209,16 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
                 totalLikes: cachedSnapshot.totalReactions,
                 totalShares: cachedSnapshot.totalReshares,
                 avgHookScore: 0,
-                topPosts: [],
+                topPosts: cachedTopPostsResult.rows.map((post) => ({
+                  id: post.id,
+                  title: post.content?.substring(0, 100) + ((post.content?.length || 0) > 100 ? '...' : ''),
+                  content: post.content,
+                  likes: post.likes || 0,
+                  comments: post.comments || 0,
+                  shares: post.shares || 0,
+                  impressions: post.impressions || 0,
+                  postedAt: post.posted_at,
+                })),
                 lastUpdated: cachedSnapshot.snapshotDate.toISOString(),
                 message: 'Using cached data (LinkedIn API rate limited)',
               });
@@ -244,6 +331,12 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       visibilityScore = Math.min(100, localPosts * 5);
     }
 
+    // Update per-post analytics from Community Management API (enriches linkedin_posts with real impressions)
+    // This runs synchronously so the topPosts query below gets fresh data
+    if (analyticsConnected && analyticsToken) {
+      await updatePostAnalyticsFromCMA(req.userId!, analyticsToken);
+    }
+
     // Get generated posts count
     const generatedCountResult = await query(
       `SELECT
@@ -266,7 +359,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     );
     const avgHookScore = Math.round(parseFloat(hookScoreResult.rows[0]?.avg_score || '0'));
 
-    // Get top LinkedIn posts for display (from cache)
+    // Get top posts for display (from linkedin_posts — real LinkedIn posts ranked by impressions)
+    console.log(`🏆 Fetching top posts for user ${req.userId} from linkedin_posts...`);
     const topPostsResult = await query(
       `SELECT
         id,
@@ -278,10 +372,11 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         posted_at
        FROM linkedin_posts
        WHERE user_id = $1
-       ORDER BY (likes + comments * 2 + shares * 3) DESC
+       ORDER BY impressions DESC
        LIMIT 10`,
       [req.userId]
     );
+    console.log(`🏆 Found ${topPostsResult.rows.length} top LinkedIn posts`);
 
     const totalEngagement = totalReactions + totalComments + totalReshares;
 
@@ -310,12 +405,14 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       totalShares: totalReshares,
       avgHookScore,
 
-      // Top posts from linkedin_posts table
+      // Top posts from linkedin_posts table (real LinkedIn posts ranked by impressions)
       topPosts: topPostsResult.rows.map((post) => ({
         id: post.id,
-        title: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+        title: post.content?.substring(0, 100) + ((post.content?.length || 0) > 100 ? '...' : ''),
+        content: post.content,
         likes: post.likes || 0,
         comments: post.comments || 0,
+        shares: post.shares || 0,
         impressions: post.impressions || 0,
         postedAt: post.posted_at,
       })),
@@ -544,14 +641,14 @@ router.get('/top-posts', authenticate, async (req: AuthRequest, res: Response) =
       `SELECT
         id,
         content,
-        hook_score,
         likes,
         comments,
-        (likes + comments * 2) as engagement_score,
-        published_at
-       FROM generated_posts
-       WHERE user_id = $1 AND status = 'published'
-       ORDER BY (likes + comments * 2) DESC
+        shares,
+        impressions,
+        posted_at
+       FROM linkedin_posts
+       WHERE user_id = $1
+       ORDER BY impressions DESC
        LIMIT 10`,
       [req.userId]
     );
@@ -559,11 +656,11 @@ router.get('/top-posts', authenticate, async (req: AuthRequest, res: Response) =
     const topPosts = topPostsResult.rows.map((post) => ({
       id: post.id,
       content: post.content,
-      hookScore: post.hook_score,
-      likes: post.likes,
-      comments: post.comments,
-      engagementScore: parseInt(post.engagement_score, 10),
-      publishedAt: post.published_at,
+      likes: post.likes || 0,
+      comments: post.comments || 0,
+      shares: post.shares || 0,
+      impressions: post.impressions || 0,
+      postedAt: post.posted_at,
     }));
 
     res.json({ topPosts });

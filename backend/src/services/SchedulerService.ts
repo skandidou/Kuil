@@ -20,7 +20,8 @@ import { PushNotificationService } from './PushNotificationService';
 
 const QUEUE_NAME = 'kuil:scheduled_posts';
 const LOCK_KEY = 'kuil:scheduler:lock';
-const LOCK_TTL_MS = 60000; // 1 minute lock
+const LOCK_TTL_MS = 120000; // 2 minute lock
+const LOCK_HEARTBEAT_INTERVAL_MS = 30000; // Extend lock every 30 seconds
 
 interface ScheduledPostJob {
   postId: string;
@@ -186,6 +187,39 @@ export class SchedulerService {
   }
 
   /**
+   * Extend lock TTL during long processing to prevent expiration
+   */
+  private static async extendLock(): Promise<boolean> {
+    try {
+      const lockData = await CacheService.get<{ instanceId: string }>(LOCK_KEY);
+      if (!lockData || lockData.instanceId !== this.instanceId) {
+        return false;
+      }
+      return await CacheService.set(
+        LOCK_KEY,
+        { instanceId: this.instanceId, acquiredAt: Date.now() },
+        LOCK_TTL_MS
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Release lock only if we still own it (prevents deleting another instance's lock)
+   */
+  private static async releaseLock(): Promise<void> {
+    try {
+      const lockData = await CacheService.get<{ instanceId: string }>(LOCK_KEY);
+      if (lockData && lockData.instanceId === this.instanceId) {
+        await CacheService.delete(LOCK_KEY);
+      }
+    } catch (error: any) {
+      Logger.error('SCHEDULER', 'Failed to release lock', {}, error);
+    }
+  }
+
+  /**
    * Process all scheduled posts that are ready to be published
    * Uses distributed lock to prevent multiple instances processing same jobs
    */
@@ -209,6 +243,14 @@ export class SchedulerService {
     }
 
     this.isRunning = true;
+
+    // Heartbeat to extend lock during processing
+    const heartbeat = setInterval(async () => {
+      const extended = await this.extendLock();
+      if (!extended) {
+        Logger.warn('SCHEDULER', 'Failed to extend lock - another instance may take over');
+      }
+    }, LOCK_HEARTBEAT_INTERVAL_MS);
 
     try {
       Logger.debug('SCHEDULER', 'Processing scheduled posts...');
@@ -259,9 +301,9 @@ export class SchedulerService {
     } catch (error: any) {
       Logger.error('SCHEDULER', 'Error processing scheduled posts', {}, error);
     } finally {
+      clearInterval(heartbeat);
       this.isRunning = false;
-      // Release lock
-      await CacheService.delete(LOCK_KEY);
+      await this.releaseLock();
     }
   }
 

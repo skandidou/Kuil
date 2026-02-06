@@ -284,12 +284,12 @@ struct TopSlotBadge: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Text(days[slot.dayOfWeek])
+            Text(slot.dayName ?? days[slot.dayOfWeek])
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(.appPrimary)
 
-            Text("\(slot.hour)h")
+            Text(slot.hourFormatted ?? "\(slot.hour)h")
                 .font(.caption)
                 .fontWeight(.bold)
                 .foregroundColor(Color.adaptivePrimaryText(colorScheme))

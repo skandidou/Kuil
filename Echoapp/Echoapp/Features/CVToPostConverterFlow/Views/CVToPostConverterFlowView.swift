@@ -9,12 +9,13 @@ import SwiftUI
 
 struct CVToPostConverterFlowView: View {
     @ObservedObject var viewModel: CVToPostConverterFlowViewModel
+    @Environment(\.colorScheme) var colorScheme
     @State private var selectedTone: NarrativeTone = .humble
     @State private var selectedAchievements: Set<UUID> = []
-    
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -25,20 +26,20 @@ struct CVToPostConverterFlowView: View {
                             viewModel.back()
                         }) {
                             Image(systemName: "arrow.left")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                         
                         Text("CV-to-Post")
                             .font(.headline)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .frame(maxWidth: .infinity)
                         
                         Button(action: {
                             viewModel.showHelp()
                         }) {
                             Image(systemName: "questionmark.circle")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                     }
@@ -50,11 +51,11 @@ struct CVToPostConverterFlowView: View {
                         Text("Generate LinkedIn Posts")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         Text("Convert your professional milestones into viral narratives.")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.lg)
                     }
@@ -65,7 +66,7 @@ struct CVToPostConverterFlowView: View {
                         ZStack {
                             RoundedRectangle(cornerRadius: CornerRadius.medium)
                                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [10]))
-                                .fill(Color.tertiaryText.opacity(0.3))
+                                .fill(Color.adaptiveTertiaryText(colorScheme).opacity(0.3))
                                 .frame(height: 200)
                             
                             VStack(spacing: Spacing.md) {
@@ -75,11 +76,11 @@ struct CVToPostConverterFlowView: View {
                                 
                                 Text("Upload CV/Resume")
                                     .font(.headline)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 
                                 Text("Drag and drop PDF or Browse files")
                                     .font(.caption)
-                                    .foregroundColor(.secondaryText)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             }
                         }
                         .padding(.horizontal, Spacing.md)
@@ -95,12 +96,12 @@ struct CVToPostConverterFlowView: View {
                         Text("Select Achievements")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
                         
                         Text("Select the points you want the AI to focus on.")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
                         
                         VStack(spacing: Spacing.sm) {
@@ -125,7 +126,7 @@ struct CVToPostConverterFlowView: View {
                         Text("Narrative Tone")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
                         
                         Picker("Tone", selection: $selectedTone) {
@@ -144,24 +145,24 @@ struct CVToPostConverterFlowView: View {
                                 Text("Generated Draft")
                                     .font(.title2)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 
                                 Spacer()
                                 
                                 Text("\(draft.count) chars")
                                     .font(.caption)
-                                    .foregroundColor(.secondaryText)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             }
                             .padding(.horizontal, Spacing.md)
                             
                             ScrollView {
                                 Text(draft)
                                     .font(.body)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                     .lineSpacing(4)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(Spacing.md)
-                                    .background(Color.appSecondaryBackground)
+                                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                                     .cornerRadius(CornerRadius.medium)
                             }
                             .frame(height: 300)
@@ -176,10 +177,10 @@ struct CVToPostConverterFlowView: View {
                                     viewModel.regenerate()
                                 }) {
                                     Image(systemName: "arrow.clockwise")
-                                        .foregroundColor(.secondaryText)
+                                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                         .font(.title3)
                                         .frame(width: 50, height: 50)
-                                        .background(Color.appSecondaryBackground)
+                                        .background(Color.adaptiveSecondaryBackground(colorScheme))
                                         .clipShape(Circle())
                                 }
                             }
@@ -205,20 +206,21 @@ struct AchievementRow: View {
     let achievement: AchievementModel
     let isSelected: Bool
     let action: () -> Void
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
                 Text(achievement.text)
                     .font(.body)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     .multilineTextAlignment(.leading)
                 
                 Spacer()
                 
                 ZStack {
                     RoundedRectangle(cornerRadius: CornerRadius.small)
-                        .stroke(isSelected ? Color.appPrimary : Color.tertiaryText, lineWidth: 2)
+                        .stroke(isSelected ? Color.appPrimary : Color.adaptiveTertiaryText(colorScheme), lineWidth: 2)
                         .frame(width: 24, height: 24)
                     
                     if isSelected {
@@ -229,7 +231,7 @@ struct AchievementRow: View {
                 }
             }
             .padding(Spacing.md)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
         }
     }

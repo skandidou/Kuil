@@ -17,6 +17,7 @@ struct UserRole: Identifiable {
 
 struct UserRoleSelectionView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @State private var selectedRole: UserRole?
     @State private var showConfirmation = false
 
@@ -61,7 +62,7 @@ struct UserRoleSelectionView: View {
 
     var body: some View {
         ZStack {
-            Color.appBackground.ignoresSafeArea()
+            Color.adaptiveBackground(colorScheme).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
@@ -69,12 +70,12 @@ struct UserRoleSelectionView: View {
                     Text("How do you define yourself?")
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         .multilineTextAlignment(.center)
 
                     Text("This helps us personalize your content")
                         .font(.callout)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, Spacing.xl)
@@ -100,7 +101,7 @@ struct UserRoleSelectionView: View {
 
                 // Bottom gradient overlay for better visibility
                 LinearGradient(
-                    colors: [Color.appBackground.opacity(0), Color.appBackground],
+                    colors: [Color.adaptiveBackground(colorScheme).opacity(0), Color.adaptiveBackground(colorScheme)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -171,12 +172,12 @@ struct UserRoleSelectionView: View {
                 Text(role.title)
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                 // Description
                 Text(role.description)
                     .font(.caption)
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -187,7 +188,7 @@ struct UserRoleSelectionView: View {
             .frame(height: 180)
             .background(
                 ZStack {
-                    Color.appSecondaryBackground
+                    Color.adaptiveSecondaryBackground(colorScheme)
 
                     if selectedRole?.id == role.id {
                         RoundedRectangle(cornerRadius: CornerRadius.medium)

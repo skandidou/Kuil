@@ -20,6 +20,7 @@ struct UserProfileResponse: Codable {
     var persona: String?           // "Visionary", "Practitioner", "Storyteller" - Mutable for updates
     var role: String?              // "Founder", "Job Seeker", etc. - Mutable for updates
     let calibrationPreferences: [Bool]?  // 12 tone calibration swipe results
+    let topicPreferences: [String]?     // Selected topic interests from onboarding
     let createdAt: String
     let lastLoginAt: String
 }

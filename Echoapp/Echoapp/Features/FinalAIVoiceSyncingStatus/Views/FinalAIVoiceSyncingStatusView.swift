@@ -9,10 +9,11 @@ import SwiftUI
 
 struct FinalAIVoiceSyncingStatusView: View {
     @ObservedObject var viewModel: FinalAIVoiceSyncingStatusViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -39,16 +40,16 @@ struct FinalAIVoiceSyncingStatusView: View {
                     // Title
                     Text("VoiceSync Status")
                         .font(.title)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     Text("VoiceSignature™ Finalized")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     Text("Your AI co-pilot is now 100% synced with your unique executive style.")
                         .font(.body)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Spacing.xl)
                     
@@ -56,7 +57,7 @@ struct FinalAIVoiceSyncingStatusView: View {
                     HStack(spacing: Spacing.xs) {
                         Text("DIRECTNESS")
                             .font(.caption)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         
                         BadgeView("100% MATCH", color: .appPrimary)
                     }
@@ -64,15 +65,15 @@ struct FinalAIVoiceSyncingStatusView: View {
                     
                     // Radar Chart Placeholder
                     RoundedRectangle(cornerRadius: CornerRadius.medium)
-                        .fill(Color.appSecondaryBackground)
+                        .fill(Color.adaptiveSecondaryBackground(colorScheme))
                         .frame(width: 250, height: 250)
                         .overlay(
                             VStack {
                                 Text("Voice Signature Radar")
-                                    .foregroundColor(.secondaryText)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                 Text("Directness • Humor • Complexity • Empathy")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                             }
                         )
                         .padding(.top, Spacing.md)
@@ -81,7 +82,7 @@ struct FinalAIVoiceSyncingStatusView: View {
                     VStack(alignment: .leading, spacing: Spacing.md) {
                         Text("DOMINANT ATTRIBUTES")
                             .font(.caption)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         
                         HStack(spacing: Spacing.md) {
                             // Primary Trait
@@ -96,16 +97,16 @@ struct FinalAIVoiceSyncingStatusView: View {
                                 
                                 Text("PRIMARY TRAIT")
                                     .font(.caption2)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                 
                                 Text("Direct")
                                     .font(.title)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             }
                             .padding(Spacing.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.appSecondaryBackground)
+                            .background(Color.adaptiveSecondaryBackground(colorScheme))
                             .cornerRadius(CornerRadius.medium)
                             
                             // Secondary Trait
@@ -120,16 +121,16 @@ struct FinalAIVoiceSyncingStatusView: View {
                                 
                                 Text("SECONDARY TRAIT")
                                     .font(.caption2)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                 
                                 Text("Empathetic")
                                     .font(.title)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             }
                             .padding(Spacing.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.appSecondaryBackground)
+                            .background(Color.adaptiveSecondaryBackground(colorScheme))
                             .cornerRadius(CornerRadius.medium)
                         }
                     }
@@ -146,7 +147,7 @@ struct FinalAIVoiceSyncingStatusView: View {
                     // Footer
                     Text("Calibration complete. Ghostwriting engine active.")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         .padding(.top, Spacing.md)
                         .padding(.bottom, Spacing.xl)
                 }

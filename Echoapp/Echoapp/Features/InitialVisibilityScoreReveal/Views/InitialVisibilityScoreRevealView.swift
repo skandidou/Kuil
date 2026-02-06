@@ -9,10 +9,11 @@ import SwiftUI
 
 struct InitialVisibilityScoreRevealView: View {
     @ObservedObject var viewModel: InitialVisibilityScoreRevealViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -23,7 +24,7 @@ struct InitialVisibilityScoreRevealView: View {
                             viewModel.back()
                         }) {
                             Image(systemName: "arrow.left")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                         
@@ -36,16 +37,16 @@ struct InitialVisibilityScoreRevealView: View {
                     VStack(spacing: Spacing.sm) {
                         Text("VISIBILITY REPORT")
                             .font(.caption)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         
                         Text("Analysis Complete")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         Text("Based on your recent activity and profile reach")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.lg)
                     }
@@ -54,7 +55,7 @@ struct InitialVisibilityScoreRevealView: View {
                     // Score Display
                     ZStack {
                         Circle()
-                            .stroke(Color.appSecondaryBackground, lineWidth: 20)
+                            .stroke(Color.adaptiveSecondaryBackground(colorScheme), lineWidth: 20)
                             .frame(width: 200, height: 200)
                         
                         Circle()
@@ -66,7 +67,7 @@ struct InitialVisibilityScoreRevealView: View {
                         VStack(spacing: 4) {
                             Text("\(viewModel.currentScore)")
                                 .font(.system(size: 56, weight: .bold))
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             
                             Text("CURRENT SCORE")
                                 .font(.caption)
@@ -80,21 +81,21 @@ struct InitialVisibilityScoreRevealView: View {
                         HStack {
                             Text("POTENTIAL GROWTH")
                                 .font(.caption)
-                                .foregroundColor(.tertiaryText)
-                            
+                                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+
                             Spacer()
-                            
-                            Text("+102%")
+
+                            Text("+\(viewModel.potentialGrowth)%")
                                 .font(.headline)
                                 .foregroundColor(.appPrimary)
                         }
-                        
+
                         HStack(spacing: Spacing.sm) {
                             Text("Target Score:")
                                 .font(.headline)
-                                .foregroundColor(.primaryText)
-                            
-                            Text("85")
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+
+                            Text("\(viewModel.targetScore)")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                                 .foregroundColor(.warningYellow)
@@ -103,24 +104,24 @@ struct InitialVisibilityScoreRevealView: View {
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
                                 Rectangle()
-                                    .fill(Color.appSecondaryBackground)
+                                    .fill(Color.adaptiveSecondaryBackground(colorScheme))
                                     .frame(height: 8)
                                     .cornerRadius(4)
-                                
+
                                 Rectangle()
                                     .fill(Color.warningYellow)
-                                    .frame(width: geometry.size.width * 0.6, height: 8)
+                                    .frame(width: geometry.size.width * CGFloat(viewModel.targetScore) / 100.0, height: 8)
                                     .cornerRadius(4)
                             }
                         }
                         .frame(height: 8)
-                        
-                        Text("By optimizing your posting schedule and content pillars, we can double your authority by next month.")
+
+                        Text(viewModel.insightText)
                             .font(.caption)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     }
                     .padding(Spacing.lg)
-                    .background(Color.appSecondaryBackground)
+                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                     .cornerRadius(CornerRadius.medium)
                     .padding(.horizontal, Spacing.md)
                     
@@ -133,11 +134,11 @@ struct InitialVisibilityScoreRevealView: View {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             Text("Personalized Insight")
                                 .font(.headline)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             
-                            Text("Your profile has great reach but lacks consistency. Ghostwriting will solve your \"blank page\" problem.")
+                            Text(viewModel.insightText)
                                 .font(.body)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             
                             Button(action: {
                                 viewModel.viewDetailedMetrics()
@@ -157,7 +158,7 @@ struct InitialVisibilityScoreRevealView: View {
                     }
                     .padding(Spacing.lg)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.appSecondaryBackground)
+                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                     .cornerRadius(CornerRadius.medium)
                     .padding(.horizontal, Spacing.md)
                     

@@ -52,11 +52,13 @@ struct AnalyticsStatusResponse: Codable {
 
 struct TopPostData: Codable {
     let id: String
-    let title: String
+    let title: String?
+    let content: String?
     let likes: Int
     let comments: Int
+    let shares: Int?
     let impressions: Int?
-    let postedAt: String
+    let postedAt: String?
 }
 
 struct FollowerAnalyticsResponse: Codable {
@@ -150,6 +152,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         loadAnalytics()
         loadInsights()
         loadBestTimes()
+        Task { await fetchFollowerTrends() }
     }
 
     func loadAnalytics() {
@@ -193,8 +196,10 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 // Top posts
                 if let posts = response.topPosts {
                     self.topPosts = posts.map { post in
-                        TopPostModel(
-                            title: post.title,
+                        // Use content preview or title (backend sends both)
+                        let displayTitle = post.title ?? post.content?.prefix(100).description ?? "LinkedIn Post"
+                        return TopPostModel(
+                            title: displayTitle,
                             likes: formatNumber(post.likes),
                             comments: String(post.comments),
                             impressions: post.impressions != nil ? formatNumber(post.impressions!) : nil

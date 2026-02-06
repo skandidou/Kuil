@@ -17,16 +17,19 @@ struct PersonalizationContext {
     let role: String?                 // "Founder", "Job Seeker", "Creator", etc.
     let tonePreferences: [Bool]?      // 12 boolean swipe results from calibration
     let voiceSignature: VoiceSignatureData?
+    let topicPreferences: [String]?   // Selected topic interests from onboarding
 
     /// Creates a PersonalizationContext from the current AppState user profile
     @MainActor
     static func current() -> PersonalizationContext {
         let profile = AppState.shared.userProfile
+        let topics = AppState.shared.selectedTopics
         return PersonalizationContext(
             persona: profile?.persona,
             role: profile?.role,
             tonePreferences: profile?.calibrationPreferences,
-            voiceSignature: profile?.voiceSignature
+            voiceSignature: profile?.voiceSignature,
+            topicPreferences: topics.isEmpty ? nil : topics
         )
     }
 
@@ -57,12 +60,16 @@ struct PersonalizationContext {
             ]
         }
 
+        if let topics = topicPreferences, !topics.isEmpty {
+            dict["topicPreferences"] = topics
+        }
+
         return dict
     }
 
     /// Check if there's any personalization data available
     var hasData: Bool {
-        return persona != nil || role != nil || tonePreferences != nil || voiceSignature != nil
+        return persona != nil || role != nil || tonePreferences != nil || voiceSignature != nil || topicPreferences != nil
     }
 
     /// Debug description for logging
@@ -72,6 +79,7 @@ struct PersonalizationContext {
         if let role = role { parts.append("role=\(role)") }
         if let tones = tonePreferences { parts.append("calibration=\(tones.filter { $0 }.count)/\(tones.count) liked") }
         if voiceSignature != nil { parts.append("voiceSignature=present") }
+        if let topics = topicPreferences { parts.append("topics=\(topics.count)") }
         return parts.isEmpty ? "no personalization" : parts.joined(separator: ", ")
     }
 }

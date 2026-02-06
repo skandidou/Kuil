@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct ProfileScopeResultView: View {
+    @Environment(\.colorScheme) var colorScheme
     @State private var voiceSignature: VoiceSignatureResponse?
     @State private var isLoading: Bool = true
     @State private var showContent: Bool = false
@@ -87,30 +88,30 @@ struct ProfileScopeResultView: View {
         ZStack {
             // Background
             LinearGradient(
-                colors: [Color(hex: "0A0A0F"), Color(hex: "1A1A2E")],
+                colors: [Color.adaptiveBackground(colorScheme), Color.adaptiveSecondaryBackground(colorScheme)],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
             if isLoading {
-                loadingView
+                LoadingView("Analyzing your profile...", subtitle: "Discovering your unique voice")
             } else {
                 ScrollView {
-                    VStack(spacing: 28) {
+                    VStack(spacing: Spacing.xl) {
                         // Header
-                        VStack(spacing: 8) {
+                        VStack(spacing: Spacing.sm) {
                             Text("Your Profilescope")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Color(hex: "6366F1"))
+                                .font(.footnote).fontWeight(.semibold)
+                                .foregroundColor(Color.appPrimary)
                                 .textCase(.uppercase)
                                 .tracking(1.5)
 
                             Text("Here's what we discovered")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.white)
+                                .font(.displayMedium)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         }
-                        .padding(.top, 40)
+                        .padding(.top, Spacing.xxl)
                         .opacity(showContent ? 1 : 0)
                         .offset(y: showContent ? 0 : 20)
 
@@ -139,7 +140,7 @@ struct ProfileScopeResultView: View {
                         Spacer()
                             .frame(height: 100)
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Spacing.lg)
                 }
 
                 // Continue button
@@ -148,7 +149,7 @@ struct ProfileScopeResultView: View {
 
                     VStack(spacing: 0) {
                         LinearGradient(
-                            colors: [Color(hex: "0A0A0F").opacity(0), Color(hex: "0A0A0F")],
+                            colors: [Color.adaptiveBackground(colorScheme).opacity(0), Color.adaptiveBackground(colorScheme)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -157,15 +158,15 @@ struct ProfileScopeResultView: View {
                         Button(action: onComplete) {
                             HStack {
                                 Text("Let's Create Content")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.headline)
                                 Image(systemName: "arrow.right")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.subheadline).fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
                             .background(
                                 LinearGradient(
-                                    colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")],
+                                    colors: [Color.appPrimary, Color(hex: "8B5CF6")],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -173,9 +174,9 @@ struct ProfileScopeResultView: View {
                             .foregroundColor(.white)
                             .cornerRadius(14)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
-                        .background(Color(hex: "0A0A0F"))
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.bottom, Spacing.xxl)
+                        .background(Color.adaptiveBackground(colorScheme))
                     }
                 }
                 .opacity(showContent ? 1 : 0)
@@ -186,66 +187,19 @@ struct ProfileScopeResultView: View {
         }
     }
 
-    // MARK: - Loading View
-
-    private var loadingView: some View {
-        VStack(spacing: 24) {
-            // Animated icon
-            ZStack {
-                Circle()
-                    .stroke(Color(hex: "6366F1").opacity(0.2), lineWidth: 3)
-                    .frame(width: 100, height: 100)
-
-                Circle()
-                    .trim(from: 0, to: 0.3)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 100, height: 100)
-                    .rotationEffect(.degrees(isLoading ? 360 : 0))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isLoading)
-
-                Image(systemName: "sparkles")
-                    .font(.system(size: 36))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-
-            VStack(spacing: 8) {
-                Text("Analyzing your profile...")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
-
-                Text("Discovering your unique voice")
-                    .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-        }
-    }
-
     // MARK: - Archetype Card
 
     private var archetypeCard: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.md) {
             Text("You are a")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .font(.footnote).fontWeight(.medium)
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
 
             Text(archetype.emoji)
-                .font(.system(size: 60))
+                .font(.system(size: 56))
 
             Text(archetype.name)
-                .font(.system(size: 32, weight: .bold))
+                .font(.displayLarge)
                 .foregroundStyle(
                     LinearGradient(
                         colors: [Color(hex: archetype.color1), Color(hex: archetype.color2)],
@@ -255,18 +209,18 @@ struct ProfileScopeResultView: View {
                 )
 
             Text(archetype.description)
-                .font(.system(size: 15))
-                .foregroundColor(.white.opacity(0.7))
+                .font(.subheadline)
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.lg)
         }
-        .padding(.vertical, 32)
+        .padding(.vertical, Spacing.xl)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: CornerRadius.xlarge)
+                .fill(Color.adaptiveSecondaryBackground(colorScheme))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: CornerRadius.xlarge)
                         .stroke(
                             LinearGradient(
                                 colors: [Color(hex: archetype.color1).opacity(0.5), Color(hex: archetype.color2).opacity(0.2)],
@@ -282,11 +236,11 @@ struct ProfileScopeResultView: View {
     // MARK: - Writes Like Card
 
     private var writesLikeCard: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.md) {
             HStack {
                 Text("You write like")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(.footnote).fontWeight(.medium)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 Spacer()
                 Text(writesLike.emoji)
                     .font(.system(size: 24))
@@ -294,25 +248,25 @@ struct ProfileScopeResultView: View {
 
             HStack {
                 Text(writesLike.name)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(.title2).fontWeight(.bold)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 Spacer()
             }
 
             HStack {
                 Text(writesLike.description)
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(.footnote)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 Spacer()
             }
         }
-        .padding(20)
+        .padding(Spacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: CornerRadius.large)
+                .fill(Color.adaptiveSecondaryBackground(colorScheme))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: CornerRadius.large)
+                        .stroke(Color.adaptiveSeparator(colorScheme), lineWidth: 1)
                 )
         )
     }
@@ -321,12 +275,12 @@ struct ProfileScopeResultView: View {
 
     @ViewBuilder
     private func traitsCard(voice: VoiceSignatureResponse) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             Text("Your Voice DNA")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.callout).fontWeight(.semibold)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
-            VStack(spacing: 14) {
+            VStack(spacing: Spacing.md) {
                 traitBar(name: "Formal", value: voice.formal, color: "3B82F6", icon: "briefcase.fill")
                 traitBar(name: "Bold", value: voice.bold, color: "EF4444", icon: "flame.fill")
                 traitBar(name: "Empathetic", value: voice.empathetic, color: "EC4899", icon: "heart.fill")
@@ -334,34 +288,34 @@ struct ProfileScopeResultView: View {
                 traitBar(name: "Concise", value: voice.brevity, color: "10B981", icon: "bolt.fill")
             }
         }
-        .padding(20)
+        .padding(Spacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: CornerRadius.large)
+                .fill(Color.adaptiveSecondaryBackground(colorScheme))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: CornerRadius.large)
+                        .stroke(Color.adaptiveSeparator(colorScheme), lineWidth: 1)
                 )
         )
     }
 
     @ViewBuilder
     private func traitBar(name: String, value: Double, color: String, icon: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.md) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.footnote)
                 .foregroundColor(Color(hex: color))
                 .frame(width: 20)
 
             Text(name)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
+                .font(.footnote).fontWeight(.medium)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 .frame(width: 80, alignment: .leading)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.white.opacity(0.1))
+                        .fill(Color.adaptiveSeparator(colorScheme))
                         .frame(height: 8)
 
                     RoundedRectangle(cornerRadius: 4)
@@ -373,7 +327,7 @@ struct ProfileScopeResultView: View {
             .frame(height: 8)
 
             Text("\(Int(value))")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.caption).fontWeight(.semibold)
                 .foregroundColor(Color(hex: color))
                 .frame(width: 24)
         }
@@ -382,29 +336,29 @@ struct ProfileScopeResultView: View {
     // MARK: - Superpower Card
 
     private var superpowerCard: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.md) {
             HStack {
                 Image(systemName: "star.fill")
                     .foregroundColor(.yellow)
                 Text("Your Superpower")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(.footnote).fontWeight(.semibold)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 Spacer()
             }
 
             Text(archetype.superpower)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.headline)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(archetype.superpowerDescription)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.6))
+                .font(.footnote)
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(20)
+        .padding(Spacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: CornerRadius.large)
                 .fill(
                     LinearGradient(
                         colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.05)],
@@ -413,7 +367,7 @@ struct ProfileScopeResultView: View {
                     )
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: CornerRadius.large)
                         .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
                 )
         )

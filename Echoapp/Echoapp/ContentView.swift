@@ -51,6 +51,7 @@ struct ContentView: View {
                         appState.hasCompletedATTRequest = true
                         // For now, go directly to home (paywall will be inserted later)
                         appState.hasCompletedOnboarding = true
+                        appState.saveOnboardingProgress()
                     }
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -60,15 +61,18 @@ struct ContentView: View {
                 ProfileScopeResultView {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         appState.hasSeenProfilescope = true
+                        appState.saveOnboardingProgress()
                     }
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
 
             } else if appState.hasCompletedToneCalibration && !appState.hasSelectedTopics {
                 // 6. Topic Interests Selection (Reddit-style)
-                TopicInterestsSelectionView { _ in
+                TopicInterestsSelectionView { topics in
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        appState.selectedTopics = topics
                         appState.hasSelectedTopics = true
+                        appState.saveOnboardingProgress()
                     }
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -82,6 +86,7 @@ struct ContentView: View {
                     .onReceive(NotificationCenter.default.publisher(for: .toneCalibrationCompleted)) { _ in
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             appState.hasCompletedToneCalibration = true
+                            appState.saveOnboardingProgress()
                             // Don't set onboarding complete yet - topics & profilescope come next
                         }
                     }
@@ -99,6 +104,7 @@ struct ContentView: View {
                             await MainActor.run {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     appState.isAuthenticated = true
+                                    appState.saveOnboardingProgress()
                                 }
                             }
                         }

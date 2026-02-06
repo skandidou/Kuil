@@ -10,10 +10,11 @@ import SwiftUI
 struct NotificationEngagementCenterView: View {
     @ObservedObject var viewModel: NotificationEngagementCenterViewModel
     @State private var selectedFilter: NotificationFilter = .all
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -23,20 +24,20 @@ struct NotificationEngagementCenterView: View {
                         viewModel.back()
                     }) {
                         Image(systemName: "arrow.left")
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .font(.headline)
                     }
                     
                     Text("Activity Center")
                         .font(.headline)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         .frame(maxWidth: .infinity)
                     
                     Button(action: {
                         viewModel.showSettings()
                     }) {
                         Image(systemName: "gearshape")
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .font(.headline)
                     }
                 }
@@ -64,7 +65,7 @@ struct NotificationEngagementCenterView: View {
                             VStack(alignment: .leading, spacing: Spacing.md) {
                                 Text("RECENT")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     .padding(.horizontal, Spacing.md)
 
                                 ForEach(viewModel.recentNotifications, id: \.id) { notification in
@@ -80,7 +81,7 @@ struct NotificationEngagementCenterView: View {
                             VStack(alignment: .leading, spacing: Spacing.md) {
                                 Text("SCHEDULED")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     .padding(.horizontal, Spacing.md)
 
                                 ForEach(viewModel.scheduledNotifications, id: \.id) { notification in
@@ -95,7 +96,7 @@ struct NotificationEngagementCenterView: View {
                             VStack(alignment: .leading, spacing: Spacing.md) {
                                 Text("EARLIER THIS WEEK")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     .padding(.horizontal, Spacing.md)
 
                                 ForEach(viewModel.earlierNotifications, id: \.id) { notification in
@@ -113,16 +114,16 @@ struct NotificationEngagementCenterView: View {
                             VStack(spacing: Spacing.md) {
                                 Image(systemName: "bell.slash")
                                     .font(.system(size: 48))
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     .padding(.top, 60)
 
                                 Text("No Activity Yet")
                                     .font(.title3)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                                 Text("Create and schedule posts to see your activity here")
                                     .font(.body)
-                                    .foregroundColor(.secondaryText)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 40)
                             }
@@ -151,15 +152,16 @@ struct FilterButton: View {
     let filter: NotificationFilter
     let isSelected: Bool
     let action: () -> Void
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: action) {
             Text(filter.rawValue)
                 .font(.headline)
-                .foregroundColor(isSelected ? .white : .secondaryText)
+                .foregroundColor(isSelected ? .white : Color.adaptiveSecondaryText(colorScheme))
                 .padding(.horizontal, Spacing.lg)
                 .padding(.vertical, Spacing.sm)
-                .background(isSelected ? Color.appPrimary : Color.appSecondaryBackground)
+                .background(isSelected ? Color.appPrimary : Color.adaptiveSecondaryBackground(colorScheme))
                 .cornerRadius(CornerRadius.large)
         }
     }
@@ -167,7 +169,8 @@ struct FilterButton: View {
 
 struct NotificationCard: View {
     let notification: NotificationModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         HStack(spacing: Spacing.md) {
             // Icon
@@ -186,7 +189,7 @@ struct NotificationCard: View {
                 HStack {
                     Text(notification.title)
                         .font(.headline)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     if notification.isNew {
                         Circle()
@@ -197,13 +200,13 @@ struct NotificationCard: View {
                 
                 Text(notification.description)
                     .font(.body)
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     .lineLimit(2)
                 
                 if let timestamp = notification.timestamp {
                     Text(timestamp)
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 }
             }
             
@@ -219,13 +222,13 @@ struct NotificationCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, Spacing.md)
                         .padding(.vertical, Spacing.sm)
-                        .background(notification.isHighlighted ? Color.appPrimary : Color.appSecondaryBackground)
+                        .background(notification.isHighlighted ? Color.appPrimary : Color.adaptiveSecondaryBackground(colorScheme))
                         .cornerRadius(CornerRadius.small)
                 }
             }
         }
         .padding(Spacing.md)
-        .background(notification.isHighlighted ? Color.appPrimary.opacity(0.1) : Color.appSecondaryBackground)
+        .background(notification.isHighlighted ? Color.appPrimary.opacity(0.1) : Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.medium)
     }
 }

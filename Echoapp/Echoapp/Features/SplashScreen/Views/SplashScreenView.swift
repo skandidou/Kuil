@@ -83,6 +83,7 @@ struct KuilLogoShape: Shape {
 }
 
 struct SplashScreenView: View {
+    @Environment(\.colorScheme) var colorScheme
     @State private var logoScale: CGFloat = 0.7
     @State private var logoOpacity: Double = 0
     @State private var textOpacity: Double = 0
@@ -94,15 +95,15 @@ struct SplashScreenView: View {
     var body: some View {
         ZStack {
             // SOLID background - must be completely opaque to hide content behind
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
 
             // Subtle gradient overlay
             LinearGradient(
                 colors: [
-                    Color.appSecondaryBackground.opacity(0.3),
+                    Color.adaptiveSecondaryBackground(colorScheme).opacity(0.3),
                     Color.clear,
-                    Color.appSecondaryBackground.opacity(0.2)
+                    Color.adaptiveSecondaryBackground(colorScheme).opacity(0.2)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -112,7 +113,7 @@ struct SplashScreenView: View {
             // Animated particles/dots in background
             ForEach(0..<12, id: \.self) { index in
                 Circle()
-                    .fill(Color.accentCyan.opacity(0.15))
+                    .fill(Color.appPrimary.opacity(0.1))
                     .frame(width: CGFloat.random(in: 4...12))
                     .offset(
                         x: CGFloat.random(in: -150...150),
@@ -185,12 +186,12 @@ struct SplashScreenView: View {
                 VStack(spacing: Spacing.xs) {
                     Text("Kuil")
                         .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                     Text("Your LinkedIn Voice")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 }
                 .opacity(textOpacity)
 

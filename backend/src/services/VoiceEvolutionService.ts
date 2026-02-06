@@ -15,10 +15,14 @@ import { ClaudeService } from './ClaudeService';
 // Configuration
 const EVOLUTION_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const BATCH_SIZE = 10; // Process this many users per check
+const ACTIVITY_WINDOW_DAYS = 14; // Only analyze users active in last N days
+const DAILY_ANALYSIS_BUDGET = 50; // Max AI analyses per day (cost control)
 
 class VoiceEvolutionServiceClass {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private dailyAnalysisCount: number = 0;
+  private lastBudgetResetDate: string = new Date().toISOString().split('T')[0];
 
   /**
    * Start the voice evolution checker
@@ -63,13 +67,41 @@ class VoiceEvolutionServiceClass {
   }
 
   /**
+   * Reset daily budget counter if a new day has started
+   */
+  private resetDailyBudgetIfNeeded(): void {
+    const today = new Date().toISOString().split('T')[0];
+    if (today !== this.lastBudgetResetDate) {
+      this.dailyAnalysisCount = 0;
+      this.lastBudgetResetDate = today;
+    }
+  }
+
+  /**
    * Check all users for voice evolution eligibility
    */
   async checkAllUsers(): Promise<void> {
     try {
-      Logger.info('VOICE_EVOLUTION', 'Starting evolution check for all users');
+      this.resetDailyBudgetIfNeeded();
 
-      // Get users who might need evolution
+      const budgetRemaining = DAILY_ANALYSIS_BUDGET - this.dailyAnalysisCount;
+      if (budgetRemaining <= 0) {
+        Logger.warn('VOICE_EVOLUTION', 'Daily analysis budget exhausted, skipping check', {
+          budget: DAILY_ANALYSIS_BUDGET,
+          used: this.dailyAnalysisCount,
+        });
+        return;
+      }
+
+      const effectiveBatchSize = Math.min(BATCH_SIZE, budgetRemaining);
+
+      Logger.info('VOICE_EVOLUTION', 'Starting evolution check for active users', {
+        activityWindowDays: ACTIVITY_WINDOW_DAYS,
+        budgetRemaining,
+        batchSize: effectiveBatchSize,
+      });
+
+      // Get users who might need evolution (only recently active users)
       const result = await query(
         `SELECT
            vs.user_id,
@@ -81,26 +113,38 @@ class VoiceEvolutionServiceClass {
          FROM voice_signatures vs
          JOIN users u ON vs.user_id = u.id
          WHERE vs.evolution_enabled = TRUE
+           AND u.last_login_at > NOW() - INTERVAL '${ACTIVITY_WINDOW_DAYS} days'
            AND (
              vs.posts_since_last_evolution >= vs.evolution_threshold
              OR vs.last_evolution_check < NOW() - INTERVAL '30 days'
              OR vs.last_evolution_check IS NULL
            )
+         ORDER BY vs.posts_since_last_evolution DESC
          LIMIT $1`,
-        [BATCH_SIZE]
+        [effectiveBatchSize]
       );
 
-      Logger.info('VOICE_EVOLUTION', `Found ${result.rows.length} users eligible for evolution check`);
+      Logger.info('VOICE_EVOLUTION', `Found ${result.rows.length} active users eligible for evolution check`);
 
       let evolved = 0;
       let skipped = 0;
       let failed = 0;
 
       for (const user of result.rows) {
+        // Check budget before each analysis
+        this.resetDailyBudgetIfNeeded();
+        if (this.dailyAnalysisCount >= DAILY_ANALYSIS_BUDGET) {
+          Logger.warn('VOICE_EVOLUTION', 'Budget exhausted mid-batch, stopping', {
+            processed: evolved + skipped + failed,
+          });
+          break;
+        }
+
         try {
           const didEvolve = await this.evolveUserVoice(user.user_id, user.name);
           if (didEvolve) {
             evolved++;
+            this.dailyAnalysisCount++;
           } else {
             skipped++;
           }
@@ -118,6 +162,8 @@ class VoiceEvolutionServiceClass {
         evolved,
         skipped,
         failed,
+        dailyBudgetUsed: this.dailyAnalysisCount,
+        dailyBudgetRemaining: DAILY_ANALYSIS_BUDGET - this.dailyAnalysisCount,
       });
     } catch (error: any) {
       Logger.error('VOICE_EVOLUTION', 'Failed to check users', {}, error);

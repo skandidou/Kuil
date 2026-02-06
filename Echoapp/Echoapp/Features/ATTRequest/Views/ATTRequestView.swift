@@ -9,6 +9,7 @@ import SwiftUI
 import AppTrackingTransparency
 
 struct ATTRequestView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var attService = ATTService.shared
     @State private var isRequesting = false
 
@@ -19,15 +20,15 @@ struct ATTRequestView: View {
             // Background gradient
             LinearGradient(
                 colors: [
-                    Color(hex: "0A0A0F"),
-                    Color(hex: "1A1A2E")
+                    Color.adaptiveBackground(colorScheme),
+                    Color.adaptiveSecondaryBackground(colorScheme)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 32) {
+            VStack(spacing: Spacing.xl) {
                 Spacer()
 
                 // Icon
@@ -36,7 +37,7 @@ struct ATTRequestView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(hex: "6366F1").opacity(0.3),
+                                    Color.appPrimary.opacity(0.3),
                                     Color(hex: "8B5CF6").opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
@@ -49,30 +50,30 @@ struct ATTRequestView: View {
                         .font(.system(size: 48, weight: .medium))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")],
+                                colors: [Color.appPrimary, Color(hex: "8B5CF6")],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, Spacing.sm)
 
                 // Title
-                VStack(spacing: 12) {
+                VStack(spacing: Spacing.md) {
                     Text("Personalize Your Experience")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.displayMedium)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         .multilineTextAlignment(.center)
 
                     Text("Allow Kuil to use your data for a better, personalized experience")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.callout)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, Spacing.lg)
                 }
 
                 // Benefits list
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Spacing.md) {
                     benefitRow(
                         icon: "sparkles",
                         title: "Smarter AI Suggestions",
@@ -91,22 +92,22 @@ struct ATTRequestView: View {
                         description: "Understand what content works best"
                     )
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 24)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.lg)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.05))
+                    RoundedRectangle(cornerRadius: CornerRadius.large)
+                        .fill(Color.adaptiveSecondaryBackground(colorScheme))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: CornerRadius.large)
+                                .stroke(Color.adaptiveSeparator(colorScheme), lineWidth: 1)
                         )
                 )
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.lg)
 
                 Spacer()
 
                 // Buttons
-                VStack(spacing: 12) {
+                VStack(spacing: Spacing.md) {
                     // Allow button
                     Button(action: {
                         requestTracking()
@@ -118,20 +119,20 @@ struct ATTRequestView: View {
                                     .scaleEffect(0.8)
                             } else {
                                 Text("Continue")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.headline)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(
                             LinearGradient(
-                                colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")],
+                                colors: [Color.appPrimary, Color(hex: "8B5CF6")],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .foregroundColor(.white)
-                        .cornerRadius(14)
+                        .cornerRadius(CornerRadius.medium)
                     }
                     .disabled(isRequesting)
 
@@ -140,39 +141,39 @@ struct ATTRequestView: View {
                         skipTracking()
                     }) {
                         Text("Not Now")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
+                            .font(.subheadline).fontWeight(.medium)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                     }
                     .disabled(isRequesting)
-                    .padding(.top, 4)
+                    .padding(.top, Spacing.xs)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.bottom, Spacing.xxl)
             }
         }
     }
 
     @ViewBuilder
     private func benefitRow(icon: String, title: String, description: String) -> some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: Spacing.md) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "6366F1").opacity(0.2))
+                    .fill(Color.appPrimary.opacity(0.2))
                     .frame(width: 40, height: 40)
 
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(hex: "6366F1"))
+                    .font(.callout).fontWeight(.medium)
+                    .foregroundColor(Color.appPrimary)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.callout).fontWeight(.semibold)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                 Text(description)
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(.footnote)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
 
             Spacer()

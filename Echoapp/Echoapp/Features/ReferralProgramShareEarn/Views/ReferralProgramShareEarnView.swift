@@ -9,10 +9,11 @@ import SwiftUI
 
 struct ReferralProgramShareEarnView: View {
     @ObservedObject var viewModel: ReferralProgramShareEarnViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -23,20 +24,20 @@ struct ReferralProgramShareEarnView: View {
                             viewModel.back()
                         }) {
                             Image(systemName: "arrow.left")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                         
                         Text("Referral Program")
                             .font(.headline)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .frame(maxWidth: .infinity)
                         
                         Button(action: {
                             viewModel.showHelp()
                         }) {
                             Image(systemName: "questionmark.circle")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                     }
@@ -58,12 +59,12 @@ struct ReferralProgramShareEarnView: View {
                         Text("Invite a founder, get 1 month of Pro free")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .multilineTextAlignment(.center)
                         
                         Text("Share your unique link and unlock premium ghostwriting features for every successful referral.")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.lg)
                     }
@@ -73,13 +74,13 @@ struct ReferralProgramShareEarnView: View {
                     VStack(alignment: .leading, spacing: Spacing.sm) {
                         Text("Your Referral Link")
                             .font(.headline)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
                         
                         HStack(spacing: Spacing.md) {
                             Text(viewModel.referralLink)
                                 .font(.body)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .lineLimit(1)
                             
                             Spacer()
@@ -93,7 +94,7 @@ struct ReferralProgramShareEarnView: View {
                             }
                         }
                         .padding(Spacing.md)
-                        .background(Color.appSecondaryBackground)
+                        .background(Color.adaptiveSecondaryBackground(colorScheme))
                         .cornerRadius(CornerRadius.medium)
                         .overlay(
                             RoundedRectangle(cornerRadius: CornerRadius.medium)
@@ -106,7 +107,7 @@ struct ReferralProgramShareEarnView: View {
                     VStack(spacing: Spacing.md) {
                         Text("QUICK SHARE")
                             .font(.caption)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         
                         HStack(spacing: Spacing.lg) {
                             ShareButton(icon: "linkedin", label: "LinkedIn") {
@@ -134,7 +135,7 @@ struct ReferralProgramShareEarnView: View {
                         Text("Referral Progress")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
                         
                         PrimaryButton("Invite More Friends", icon: "person.badge.plus") {
@@ -147,7 +148,7 @@ struct ReferralProgramShareEarnView: View {
                             HStack {
                                 Text("Next Milestone: \(viewModel.nextMilestone) Referrals")
                                     .font(.body)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 
                                 Spacer()
                                 
@@ -160,7 +161,7 @@ struct ReferralProgramShareEarnView: View {
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
                                     Rectangle()
-                                        .fill(Color.appSecondaryBackground)
+                                        .fill(Color.adaptiveSecondaryBackground(colorScheme))
                                         .frame(height: 8)
                                         .cornerRadius(4)
                                     
@@ -176,13 +177,13 @@ struct ReferralProgramShareEarnView: View {
                             HStack {
                                 Text("0")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                 
                                 Spacer()
                                 
                                 Text("\(viewModel.nextMilestone) FOUNDERS")
                                     .font(.caption)
-                                    .foregroundColor(.tertiaryText)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                             }
                             .padding(.horizontal, Spacing.md)
                         }
@@ -195,7 +196,7 @@ struct ReferralProgramShareEarnView: View {
                             
                             Text("Your Pro subscription will be automatically extended once your friend upgrades their account.")
                                 .font(.caption)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         }
                         .padding(Spacing.md)
                         .background(Color.successGreen.opacity(0.1))
@@ -218,7 +219,8 @@ struct ShareButton: View {
     let icon: String
     let label: String
     let action: () -> Void
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: Spacing.sm) {
@@ -226,12 +228,12 @@ struct ShareButton: View {
                     .foregroundColor(.white)
                     .font(.title3)
                     .frame(width: 50, height: 50)
-                    .background(Color.appSecondaryBackground)
+                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                     .clipShape(Circle())
                 
                 Text(label)
                     .font(.caption)
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
             .frame(maxWidth: .infinity)
         }

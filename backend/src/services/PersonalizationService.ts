@@ -618,7 +618,7 @@ class PersonalizationServiceClass {
    * Analyze and update success patterns from high-performing posts
    */
   async analyzeSuccessPatterns(userId: string): Promise<SuccessPattern[]> {
-    // Get all posts with engagement data
+    // Get top posts with engagement data (limited to avoid unbounded result sets)
     const postsResult = await query(
       `SELECT
          lp.content,
@@ -631,7 +631,8 @@ class PersonalizationServiceClass {
        FROM linkedin_posts lp
        LEFT JOIN generated_posts gp ON gp.linkedin_post_id = lp.linkedin_post_id
        WHERE lp.user_id = $1 AND lp.content IS NOT NULL AND LENGTH(lp.content) > 50
-       ORDER BY engagement_score DESC`,
+       ORDER BY engagement_score DESC
+       LIMIT 100`,
       [userId]
     );
 
@@ -689,34 +690,45 @@ class PersonalizationServiceClass {
       pattern.successRate = totalOccurrences > 0 ? highPerformerOccurrences / totalOccurrences : 0;
     }
 
-    // Save patterns to database
+    // Save patterns to database (batch upsert)
+    const patternsToSave = Array.from(patterns.values()).filter(p => p.occurrenceCount >= 2);
     const savedPatterns: SuccessPattern[] = [];
-    for (const pattern of patterns.values()) {
-      if (pattern.occurrenceCount >= 2) {
-        // Only save patterns seen at least twice
-        await query(
-          `INSERT INTO success_patterns
-           (user_id, pattern_type, pattern_value, occurrence_count, avg_engagement_score,
-            avg_hook_score, success_rate, last_updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-           ON CONFLICT (user_id, pattern_type, pattern_value) DO UPDATE SET
-             occurrence_count = EXCLUDED.occurrence_count,
-             avg_engagement_score = EXCLUDED.avg_engagement_score,
-             avg_hook_score = EXCLUDED.avg_hook_score,
-             success_rate = EXCLUDED.success_rate,
-             last_updated_at = NOW()`,
-          [
-            userId,
-            pattern.patternType,
-            pattern.patternValue,
-            pattern.occurrenceCount,
-            pattern.avgEngagementScore,
-            pattern.avgHookScore,
-            pattern.successRate,
-          ]
+
+    if (patternsToSave.length > 0) {
+      const values: any[] = [];
+      const placeholders: string[] = [];
+
+      patternsToSave.forEach((pattern, index) => {
+        const offset = index * 7;
+        placeholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, NOW())`
         );
-        savedPatterns.push(pattern);
-      }
+        values.push(
+          userId,
+          pattern.patternType,
+          pattern.patternValue,
+          pattern.occurrenceCount,
+          pattern.avgEngagementScore,
+          pattern.avgHookScore,
+          pattern.successRate
+        );
+      });
+
+      await query(
+        `INSERT INTO success_patterns
+         (user_id, pattern_type, pattern_value, occurrence_count, avg_engagement_score,
+          avg_hook_score, success_rate, last_updated_at)
+         VALUES ${placeholders.join(', ')}
+         ON CONFLICT (user_id, pattern_type, pattern_value) DO UPDATE SET
+           occurrence_count = EXCLUDED.occurrence_count,
+           avg_engagement_score = EXCLUDED.avg_engagement_score,
+           avg_hook_score = EXCLUDED.avg_hook_score,
+           success_rate = EXCLUDED.success_rate,
+           last_updated_at = NOW()`,
+        values
+      );
+
+      savedPatterns.push(...patternsToSave);
     }
 
     Logger.info('PERSONALIZATION', 'Success patterns analyzed', {

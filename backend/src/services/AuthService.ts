@@ -1,6 +1,7 @@
 import jwt, { Secret } from 'jsonwebtoken';
 import CryptoJS from 'crypto-js';
 import { config } from '../config/env';
+import { Logger } from './LoggerService';
 
 export class AuthService {
   /**
@@ -52,8 +53,32 @@ export class AuthService {
    * Decrypt LinkedIn access token from database
    */
   static decryptToken(encryptedToken: string): string {
-    const bytes = CryptoJS.AES.decrypt(encryptedToken, config.encryption.key);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    try {
+      if (!encryptedToken) {
+        throw new Error('Encrypted token is empty or undefined');
+      }
+
+      const bytes = CryptoJS.AES.decrypt(encryptedToken, config.encryption.key);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+
+      if (!decrypted) {
+        Logger.error('AUTH', 'Token decryption produced empty result', {
+          encryptedLength: encryptedToken.length,
+          encryptedPrefix: encryptedToken.substring(0, 20) + '...',
+        });
+        throw new Error('Token decryption failed: result is empty. Token may be corrupted or encrypted with a different key.');
+      }
+
+      return decrypted;
+    } catch (error: any) {
+      if (error.message.includes('Token decryption failed') || error.message.includes('empty or undefined')) {
+        throw error;
+      }
+      Logger.error('AUTH', 'Unexpected token decryption error', {
+        errorMessage: error.message,
+      });
+      throw new Error(`Token decryption failed: ${error.message}`);
+    }
   }
 
   /**

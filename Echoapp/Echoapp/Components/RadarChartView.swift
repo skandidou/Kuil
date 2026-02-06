@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct RadarChartView: View {
-    let dimensions: [String] // ["Formal", "Bold", "Empathetic", "Analytical", "Storytelling"]
-    let values: [Double] // Values 0-10 for each dimension
+    let dimensions: [String]
+    let values: [Double]
     let maxValue: Double = 10.0
+    @Environment(\.colorScheme) var colorScheme
     @State private var animationProgress: Double = 0
 
     var body: some View {
@@ -20,6 +21,7 @@ struct RadarChartView: View {
                 values: values,
                 maxValue: maxValue,
                 animationProgress: animationProgress,
+                colorScheme: colorScheme,
                 size: geometry.size
             )
         }
@@ -37,6 +39,7 @@ private struct ChartContent: View {
     let values: [Double]
     let maxValue: Double
     let animationProgress: Double
+    let colorScheme: ColorScheme
     let size: CGSize
 
     private var center: CGPoint {
@@ -63,7 +66,7 @@ private struct ChartContent: View {
     private var backgroundGrid: some View {
         ForEach(1..<6) { level in
             RadarPolygon(sides: 5, scale: Double(level) / 5.0)
-                .stroke(Color.appSecondaryBackground, lineWidth: 1)
+                .stroke(Color.adaptiveSeparator(colorScheme), lineWidth: 1)
                 .frame(width: radius * 2, height: radius * 2)
         }
     }
@@ -95,7 +98,7 @@ private struct ChartContent: View {
 
         return Text(dimensions[index].uppercased())
             .font(.caption2)
-            .foregroundColor(.secondaryText)
+            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             .position(x: x, y: y)
     }
 }

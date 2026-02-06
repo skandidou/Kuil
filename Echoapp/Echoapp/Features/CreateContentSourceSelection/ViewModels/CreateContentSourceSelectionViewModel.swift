@@ -54,14 +54,7 @@ class CreateContentSourceSelectionViewModel: ObservableObject {
             )
         ]
         
-        otherMethods = [
-            ContentSource(
-                title: "From Video",
-                description: "Convert video content to posts",
-                icon: "video.fill",
-                isAIPick: false
-            )
-        ]
+        otherMethods = []
     }
     
     func selectSource(_ source: ContentSource) {
@@ -69,9 +62,6 @@ class CreateContentSourceSelectionViewModel: ObservableObject {
         NotificationCenter.default.post(name: .contentSourceSelected, object: source)
     }
     
-    func showHelp() {
-        // Handle help action
-    }
 }
 
 extension Notification.Name {

@@ -12,6 +12,7 @@ struct UserProfileVoiceSettingsView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) var colorScheme
     @State private var showToneCalibration = false
+    @State private var showTopicEditor = false
     @State private var chartAppeared = false
     @State private var showAppearancePicker = false
 
@@ -40,16 +41,24 @@ struct UserProfileVoiceSettingsView: View {
                         voiceSignatureCard
                             .padding(.horizontal, Spacing.lg)
 
-                        // Pro Plan Card
-                        proPlanCard
-                            .padding(.horizontal, Spacing.lg)
+                        // Success Patterns Section
+                        if !viewModel.successPatterns.isEmpty {
+                            successPatternsSection
+                                .padding(.horizontal, Spacing.lg)
+                        }
+
+                        // Voice Evolution History
+                        if !viewModel.evolutionHistory.isEmpty {
+                            evolutionHistorySection
+                                .padding(.horizontal, Spacing.lg)
+                        }
 
                         // LinkedIn Account Section
                         linkedInSection
                             .padding(.horizontal, Spacing.lg)
 
-                        // Referral Program Card
-                        referralCard
+                        // Preferences Section (Redo Calibration + Edit Topics)
+                        preferencesSection
                             .padding(.horizontal, Spacing.lg)
 
                         // App Settings Section
@@ -63,8 +72,19 @@ struct UserProfileVoiceSettingsView: View {
             .sheet(isPresented: $showToneCalibration) {
                 ToneCalibrationSwipeFlowView(viewModel: ToneCalibrationSwipeFlowViewModel())
             }
+            .sheet(isPresented: $showTopicEditor) {
+                TopicInterestsSelectionView { updatedTopics in
+                    appState.selectedTopics = updatedTopics
+                    showTopicEditor = false
+                }
+            }
             .sheet(isPresented: $showAppearancePicker) {
                 appearancePicker
+            }
+            .alert(viewModel.infoAlertTitle, isPresented: $viewModel.showInfoAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.infoAlertMessage)
             }
         }
     }
@@ -157,17 +177,19 @@ struct UserProfileVoiceSettingsView: View {
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up")
-                        .font(.caption2)
-                    Text("+12% Confidence")
-                        .font(.caption)
+                if !viewModel.confidenceLabel.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: confidenceIcon(viewModel.confidenceLabel))
+                            .font(.caption2)
+                        Text("\(viewModel.confidenceLabel) Confidence")
+                            .font(.caption)
+                    }
+                    .foregroundColor(confidenceColor(viewModel.confidenceLabel))
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, 4)
+                    .background(confidenceColor(viewModel.confidenceLabel).opacity(0.15))
+                    .cornerRadius(CornerRadius.small)
                 }
-                .foregroundColor(.accentCyan)
-                .padding(.horizontal, Spacing.sm)
-                .padding(.vertical, 4)
-                .background(Color.accentCyan.opacity(0.15))
-                .cornerRadius(CornerRadius.small)
             }
 
             // Tone Badge
@@ -248,6 +270,35 @@ struct UserProfileVoiceSettingsView: View {
             .background(Color.adaptiveBackground(colorScheme).opacity(0.5))
             .cornerRadius(CornerRadius.medium)
 
+            // Voice Metadata
+            if viewModel.postsAnalyzed > 0 {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.text.fill")
+                            .font(.caption2)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                        Text("\(viewModel.postsAnalyzed) posts analyzed")
+                            .font(.caption)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                    }
+
+                    Spacer()
+
+                    if let lastDate = viewModel.lastAnalyzedAt {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.caption2)
+                            Text(formatRelativeDate(lastDate))
+                                .font(.caption)
+                        }
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                    }
+                }
+                .padding(Spacing.sm)
+                .background(Color.adaptiveBackground(colorScheme).opacity(0.5))
+                .cornerRadius(CornerRadius.small)
+            }
+
             // Re-analyze Button with gradient
             Button(action: {
                 showToneCalibration = true
@@ -296,62 +347,169 @@ struct UserProfileVoiceSettingsView: View {
         .shadow(color: Color.appPrimary.opacity(0.1), radius: 20)
     }
 
-    // MARK: - Pro Plan Card
-    private var proPlanCard: some View {
-        HStack(spacing: Spacing.md) {
-            ZStack {
-                Circle()
-                    .fill(Color.warningYellow.opacity(0.2))
-                    .frame(width: 50, height: 50)
-
-                Image(systemName: "star.fill")
+    // MARK: - Success Patterns Section
+    private var successPatternsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack {
+                Image(systemName: "trophy.fill")
                     .foregroundColor(.warningYellow)
                     .font(.title3)
-            }
-
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Pro Plan")
-                    .font(.headline)
+                Text("Your Style DNA")
+                    .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-
-                Text("Billed monthly. Renews Oct 12, 2023.")
-                    .font(.caption)
-                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
 
-            Spacer()
+            VStack(spacing: Spacing.sm) {
+                ForEach(viewModel.successPatterns) { pattern in
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: patternTypeIcon(pattern.type))
+                            .foregroundColor(.appPrimary)
+                            .font(.callout)
+                            .frame(width: 28)
 
-            Button(action: {
-                viewModel.manageSubscription()
-            }) {
-                HStack(spacing: 4) {
-                    Text("Manage")
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(formatPatternLabel(pattern.type))
+                                .font(.caption)
+                                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                            Text(pattern.value)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(Int(pattern.successRate * 100))%")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.successGreen)
+                            Text("success")
+                                .font(.caption2)
+                                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                        }
+                    }
+                    .padding(Spacing.md)
+                    .background(Color.adaptiveBackground(colorScheme).opacity(0.5))
+                    .cornerRadius(CornerRadius.medium)
                 }
-                .font(.callout)
-                .fontWeight(.semibold)
-                .foregroundColor(.appPrimary)
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.sm)
-                .background(Color.appPrimary.opacity(0.15))
-                .cornerRadius(CornerRadius.small)
             }
         }
         .padding(Spacing.lg)
-        .background(
-            LinearGradient(
-                colors: [Color.warningYellow.opacity(0.15), Color.warningYellow.opacity(0.05)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.large)
         .overlay(
             RoundedRectangle(cornerRadius: CornerRadius.large)
-                .stroke(Color.warningYellow.opacity(0.3), lineWidth: 1)
+                .stroke(Color.warningYellow.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    // MARK: - Evolution History Section
+    private var evolutionHistorySection: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .foregroundColor(.accentCyan)
+                    .font(.title3)
+                Text("Voice Evolution")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(viewModel.evolutionHistory.enumerated()), id: \.element.id) { index, entry in
+                    HStack(spacing: Spacing.md) {
+                        // Timeline dot & line
+                        VStack(spacing: 0) {
+                            Circle()
+                                .fill(index == 0 ? Color.appPrimary : Color.adaptiveTertiaryText(colorScheme).opacity(0.4))
+                                .frame(width: 10, height: 10)
+
+                            if index < viewModel.evolutionHistory.count - 1 {
+                                Rectangle()
+                                    .fill(Color.adaptiveTertiaryText(colorScheme).opacity(0.2))
+                                    .frame(width: 2)
+                                    .frame(maxHeight: .infinity)
+                            }
+                        }
+                        .frame(width: 10)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(entry.primaryTone)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(index == 0 ? Color.appPrimary : Color.adaptivePrimaryText(colorScheme))
+
+                                Spacer()
+
+                                Text(formatShortDate(entry.createdAt))
+                                    .font(.caption2)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                            }
+
+                            if let reason = entry.triggerReason {
+                                Text(formatTriggerReason(reason))
+                                    .font(.caption)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                            }
+                        }
+                        .padding(.vertical, Spacing.sm)
+                    }
+                }
+            }
+        }
+        .padding(Spacing.lg)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
+        .cornerRadius(CornerRadius.large)
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.large)
+                .stroke(Color.accentCyan.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Preferences Section
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            Text("PREFERENCES")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+
+            VStack(spacing: 0) {
+                // Redo Tone Calibration
+                SettingRow(
+                    icon: "waveform.path.ecg",
+                    title: "Redo Tone Calibration",
+                    subtitle: "Re-analyze your writing style",
+                    action: {
+                        showToneCalibration = true
+                    },
+                    colorScheme: colorScheme
+                )
+
+                Divider()
+                    .background(Color.adaptiveBackground(colorScheme))
+                    .padding(.leading, 60)
+
+                // Edit Topic Interests
+                SettingRow(
+                    icon: "tag.fill",
+                    title: "Edit Topic Interests",
+                    subtitle: appState.selectedTopics.isEmpty
+                        ? "Choose your content topics"
+                        : "\(appState.selectedTopics.count) topics selected",
+                    action: {
+                        showTopicEditor = true
+                    },
+                    colorScheme: colorScheme
+                )
+            }
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
+            .cornerRadius(CornerRadius.large)
+        }
     }
 
     // MARK: - LinkedIn Section
@@ -390,64 +548,6 @@ struct UserProfileVoiceSettingsView: View {
             .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.large)
         }
-    }
-
-    // MARK: - Referral Card
-    private var referralCard: some View {
-        HStack(spacing: Spacing.md) {
-            ZStack {
-                Circle()
-                    .fill(Color.successGreen.opacity(0.2))
-                    .frame(width: 50, height: 50)
-
-                Image(systemName: "gift.fill")
-                    .foregroundColor(.successGreen)
-                    .font(.title3)
-            }
-
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Referral Program")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primaryText)
-
-                Text("Get 1 Month Free for every invite")
-                    .font(.caption)
-                    .foregroundColor(.secondaryText)
-            }
-
-            Spacer()
-
-            Button(action: {
-                viewModel.openReferral()
-            }) {
-                HStack(spacing: Spacing.xs) {
-                    Image(systemName: "person.badge.plus")
-                    Text("Invite")
-                        .fontWeight(.semibold)
-                }
-                .font(.callout)
-                .foregroundColor(.white)
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.sm)
-                .background(Color.successGreen)
-                .cornerRadius(CornerRadius.medium)
-                .shadow(color: Color.successGreen.opacity(0.4), radius: 8)
-            }
-        }
-        .padding(Spacing.lg)
-        .background(
-            LinearGradient(
-                colors: [Color.successGreen.opacity(0.15), Color.successGreen.opacity(0.05)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-        .cornerRadius(CornerRadius.large)
-        .overlay(
-            RoundedRectangle(cornerRadius: CornerRadius.large)
-                .stroke(Color.successGreen.opacity(0.3), lineWidth: 1)
-        )
     }
 
     // MARK: - App Settings Section
@@ -529,6 +629,87 @@ struct UserProfileVoiceSettingsView: View {
         return "System"
     }
 
+    private func confidenceIcon(_ label: String) -> String {
+        switch label {
+        case "High": return "checkmark.shield.fill"
+        case "Medium": return "shield.lefthalf.filled"
+        default: return "shield"
+        }
+    }
+
+    private func confidenceColor(_ label: String) -> Color {
+        switch label {
+        case "High": return .successGreen
+        case "Medium": return .accentCyan
+        default: return .warningYellow
+        }
+    }
+
+    private func patternTypeIcon(_ type: String) -> String {
+        switch type.lowercased() {
+        case "hook_style": return "text.quote"
+        case "length": return "ruler"
+        case "structure": return "list.bullet"
+        case "emoji_usage": return "face.smiling"
+        case "cta_style": return "arrow.right.circle"
+        default: return "sparkles"
+        }
+    }
+
+    private func formatPatternLabel(_ type: String) -> String {
+        switch type.lowercased() {
+        case "hook_style": return "HOOK STYLE"
+        case "length": return "IDEAL LENGTH"
+        case "structure": return "POST STRUCTURE"
+        case "emoji_usage": return "EMOJI USAGE"
+        case "cta_style": return "CALL TO ACTION"
+        default: return type.uppercased()
+        }
+    }
+
+    private func formatRelativeDate(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: isoString)
+        if date == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            date = formatter.date(from: isoString)
+        }
+        guard let parsed = date else { return "Recently" }
+
+        let days = Calendar.current.dateComponents([.day], from: parsed, to: Date()).day ?? 0
+        if days == 0 { return "Today" }
+        if days == 1 { return "Yesterday" }
+        if days < 7 { return "\(days) days ago" }
+        if days < 30 { return "\(days / 7) weeks ago" }
+        return "\(days / 30) months ago"
+    }
+
+    private func formatShortDate(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: isoString)
+        if date == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            date = formatter.date(from: isoString)
+        }
+        guard let parsed = date else { return "" }
+
+        let df = DateFormatter()
+        df.dateFormat = "MMM d"
+        return df.string(from: parsed)
+    }
+
+    private func formatTriggerReason(_ reason: String) -> String {
+        switch reason.lowercased() {
+        case "periodic": return "Scheduled re-analysis"
+        case "manual": return "Manual re-analysis"
+        case "threshold": return "New posts threshold reached"
+        case "initial": return "Initial analysis"
+        default: return reason.capitalized
+        }
+    }
+
     // MARK: - Appearance Picker
     private var appearancePicker: some View {
         NavigationView {
@@ -597,7 +778,7 @@ struct SettingRow: View {
     let icon: String
     let title: String
     let subtitle: String?
-    var titleColor: Color = .primaryText
+    var titleColor: Color = .clear
     var iconColor: Color = .appPrimary
     let action: () -> Void
     let colorScheme: ColorScheme
@@ -613,7 +794,7 @@ struct SettingRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.body)
-                        .foregroundColor(titleColor == .primaryText ? Color.adaptivePrimaryText(colorScheme) : titleColor)
+                        .foregroundColor(titleColor == .clear ? Color.adaptivePrimaryText(colorScheme) : titleColor)
 
                     if let subtitle = subtitle {
                         Text(subtitle)

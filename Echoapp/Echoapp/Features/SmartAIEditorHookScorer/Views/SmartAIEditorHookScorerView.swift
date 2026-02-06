@@ -14,7 +14,6 @@ struct SmartAIEditorHookScorerView: View {
     @FocusState private var isEditorFocused: Bool
     @State private var animatedHookScore: Double = 0
     @State private var showSuggestion = false
-    @State private var toolbarExpanded = false
 
     var body: some View {
         ZStack {
@@ -203,35 +202,49 @@ struct SmartAIEditorHookScorerView: View {
                 }
             }
 
-            // Animated progress bar with gradient
+            // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Background track
                     Capsule()
                         .fill(Color.adaptiveSecondaryBackground(colorScheme))
-                        .frame(height: 10)
+                        .frame(height: 8)
 
-                    // Gradient progress
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: hookScoreGradient(animatedHookScore),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * (animatedHookScore / 100), height: 10)
-                        .animation(.appDefault, value: animatedHookScore)
-
-                    // Glow effect
-                    Capsule()
-                        .fill(hookScoreColor(animatedHookScore).opacity(0.4))
-                        .frame(width: geometry.size.width * (animatedHookScore / 100), height: 10)
-                        .blur(radius: 6)
+                        .fill(hookScoreColor(animatedHookScore))
+                        .frame(width: geometry.size.width * (animatedHookScore / 100), height: 8)
                         .animation(.appDefault, value: animatedHookScore)
                 }
             }
-            .frame(height: 10)
+            .frame(height: 8)
+
+            // Calibrated score badge (if available)
+            if let calibrated = viewModel.calibratedHookScore, calibrated != viewModel.hookScore {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "person.fill.checkmark")
+                        .font(.caption)
+                        .foregroundColor(.accentCyan)
+
+                    Text("Personalized Score: \(calibrated)/100")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.accentCyan)
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.xs)
+                .background(Color.accentCyan.opacity(0.1))
+                .cornerRadius(CornerRadius.small)
+            }
+
+            // Persona badge
+            if let persona = AppState.shared.userProfile?.persona {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.caption2)
+                    Text("Optimized for \(persona) tone")
+                        .font(.caption2)
+                }
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+            }
 
             // Score message with icon
             HStack(spacing: Spacing.sm) {
@@ -244,97 +257,67 @@ struct SmartAIEditorHookScorerView: View {
                     .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
             }
             .padding(.top, Spacing.xs)
+
+            // All AI suggestions (expandable)
+            if viewModel.allSuggestions.count > 1 {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    ForEach(Array(viewModel.allSuggestions.enumerated()), id: \.offset) { index, suggestion in
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.caption2)
+                                .foregroundColor(.warningYellow)
+                                .padding(.top, 2)
+
+                            Text(suggestion)
+                                .font(.caption)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                        }
+                    }
+                }
+                .padding(Spacing.md)
+                .background(Color.warningYellow.opacity(0.05))
+                .cornerRadius(CornerRadius.small)
+            }
         }
         .padding(Spacing.lg)
-        .background(
-            ZStack {
-                Color.adaptiveSecondaryBackground(colorScheme)
-
-                // Subtle gradient overlay
-                LinearGradient(
-                    colors: [
-                        hookScoreColor(animatedHookScore).opacity(0.1),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                // Border glow
-                RoundedRectangle(cornerRadius: CornerRadius.large)
-                    .stroke(
-                        hookScoreColor(animatedHookScore).opacity(0.3),
-                        lineWidth: 1
-                    )
-            }
-        )
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
         .cornerRadius(CornerRadius.large)
-        .shadow(color: hookScoreColor(animatedHookScore).opacity(0.2), radius: 20)
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.large)
+                .stroke(hookScoreColor(animatedHookScore).opacity(0.2), lineWidth: 1)
+        )
     }
 
     // MARK: - Editor Toolbar
     private var editorToolbarView: some View {
-        VStack(spacing: Spacing.md) {
-            HStack(spacing: Spacing.md) {
-                // Text formatting buttons
-                ForEach(toolbarButtons, id: \.icon) { button in
-                    Button(action: button.action) {
-                        Group {
-                            if let icon = button.icon {
-                                Image(systemName: icon)
-                            } else if let text = button.text {
-                                Text(text)
-                                    .fontWeight(button.isBold ? .bold : .regular)
-                                    .italic(button.isItalic)
-                            }
-                        }
-                        .font(.headline)
-                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                        .frame(width: 40, height: 40)
-                        .background(Color.adaptiveSecondaryBackground(colorScheme))
-                        .cornerRadius(CornerRadius.small)
-                    }
+        HStack {
+            Spacer()
+
+            // AI Cleanup button with gradient
+            Button(action: {
+                viewModel.aiCleanup()
+            }) {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "sparkles")
+                        .font(.callout)
+                    Text("AI ENHANCE")
+                        .font(.caption)
+                        .fontWeight(.bold)
                 }
-
-                Spacer()
-
-                // AI Cleanup button with gradient
-                Button(action: {
-                    viewModel.aiCleanup()
-                }) {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "sparkles")
-                            .font(.callout)
-                        Text("AI ENHANCE")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.appPrimary, Color.accentCyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                .foregroundColor(.white)
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    LinearGradient(
+                        colors: [Color.appPrimary, Color.accentCyan],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-                    .cornerRadius(CornerRadius.medium)
-                    .shadow(color: Color.appPrimary.opacity(0.4), radius: 8)
-                }
+                )
+                .cornerRadius(CornerRadius.medium)
+                .shadow(color: Color.appPrimary.opacity(0.4), radius: 8)
             }
         }
-    }
-
-    private var toolbarButtons: [ToolbarButton] {
-        [
-            ToolbarButton(text: "B", isBold: true, action: {}),
-            ToolbarButton(text: "I", isItalic: true, action: {}),
-            ToolbarButton(icon: "list.bullet", action: {}),
-            ToolbarButton(icon: "link", action: {}),
-            ToolbarButton(text: "@", action: {}),
-            ToolbarButton(text: "#", action: {})
-        ]
     }
 
     // MARK: - Content Editor
@@ -612,15 +595,6 @@ struct SmartAIEditorHookScorerView: View {
             .background(Color.adaptiveBackground(colorScheme))
         }
     }
-}
-
-// MARK: - Supporting Types
-struct ToolbarButton {
-    var icon: String?
-    var text: String?
-    var isBold: Bool = false
-    var isItalic: Bool = false
-    var action: () -> Void
 }
 
 enum ContentViewType {

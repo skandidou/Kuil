@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct TopicInterestsSelectionView: View {
+    @Environment(\.colorScheme) var colorScheme
     @State private var selectedTopics: Set<String> = []
     @State private var isLoading: Bool = false
     @State private var searchText: String = ""
@@ -86,7 +87,7 @@ struct TopicInterestsSelectionView: View {
         ZStack {
             // Background
             LinearGradient(
-                colors: [Color(hex: "0A0A0F"), Color(hex: "1A1A2E")],
+                colors: [Color.adaptiveBackground(colorScheme), Color.adaptiveSecondaryBackground(colorScheme)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -96,59 +97,59 @@ struct TopicInterestsSelectionView: View {
                 // Header
                 VStack(spacing: 12) {
                     Text("What topics interest you?")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.displaySmall)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
                     Text("Select \(minTopics)-\(maxTopics) topics to personalize your AI suggestions")
-                        .font(.system(size: 15))
-                        .foregroundColor(.white.opacity(0.6))
+                        .font(.subheadline)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .multilineTextAlignment(.center)
 
                     // Selection counter
                     HStack(spacing: 8) {
                         ForEach(0..<maxTopics, id: \.self) { index in
                             Circle()
-                                .fill(index < selectedTopics.count ? Color(hex: "6366F1") : Color.white.opacity(0.2))
+                                .fill(index < selectedTopics.count ? Color.appPrimary : Color.adaptiveSeparator(colorScheme))
                                 .frame(width: 8, height: 8)
                         }
                     }
                     .padding(.top, 8)
 
                     Text("\(selectedTopics.count) selected")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(canContinue ? Color(hex: "6366F1") : .white.opacity(0.5))
+                        .font(.footnote).fontWeight(.medium)
+                        .foregroundColor(canContinue ? Color.appPrimary : Color.adaptiveTertiaryText(colorScheme))
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.lg)
+                .padding(.bottom, Spacing.md)
 
                 // Search bar
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                     TextField("", text: $searchText)
                         .placeholder(when: searchText.isEmpty) {
                             Text("Search topics...")
-                                .foregroundColor(.white.opacity(0.3))
+                                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                 }
-                .padding(12)
+                .padding(Spacing.md)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: CornerRadius.medium)
+                        .fill(Color.adaptiveSecondaryBackground(colorScheme))
                 )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.bottom, Spacing.md)
 
                 // Topics grid
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: Spacing.lg) {
                         ForEach(filteredCategories, id: \.category) { category in
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(category.category)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .font(.footnote).fontWeight(.semibold)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     .textCase(.uppercase)
 
                                 FlowLayout(spacing: 10) {
@@ -159,14 +160,14 @@ struct TopicInterestsSelectionView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Spacing.lg)
                     .padding(.bottom, 120)
                 }
 
                 // Bottom button
                 VStack(spacing: 0) {
                     Divider()
-                        .background(Color.white.opacity(0.1))
+                        .background(Color.adaptiveSeparator(colorScheme))
 
                     Button(action: saveAndContinue) {
                         HStack {
@@ -176,7 +177,7 @@ struct TopicInterestsSelectionView: View {
                                     .scaleEffect(0.8)
                             } else {
                                 Text("Continue")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.headline)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -184,20 +185,20 @@ struct TopicInterestsSelectionView: View {
                         .background(
                             LinearGradient(
                                 colors: canContinue
-                                    ? [Color(hex: "6366F1"), Color(hex: "8B5CF6")]
-                                    : [Color.gray.opacity(0.3), Color.gray.opacity(0.2)],
+                                    ? [Color.appPrimary, Color(hex: "8B5CF6")]
+                                    : [Color.adaptiveTertiaryText(colorScheme).opacity(0.3), Color.adaptiveTertiaryText(colorScheme).opacity(0.3)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .foregroundColor(.white)
-                        .cornerRadius(14)
+                        .cornerRadius(CornerRadius.medium)
                     }
                     .disabled(!canContinue || isLoading)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
                 }
-                .background(Color(hex: "0A0A0F").opacity(0.95))
+                .background(Color.adaptiveBackground(colorScheme).opacity(0.95))
             }
         }
     }
@@ -211,20 +212,20 @@ struct TopicInterestsSelectionView: View {
         }) {
             HStack(spacing: 8) {
                 Image(systemName: topic.icon)
-                    .font(.system(size: 14))
+                    .font(.footnote)
                     .foregroundColor(isSelected ? .white : Color(hex: topic.color))
 
                 Text(topic.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.9))
+                    .font(.footnote).fontWeight(.medium)
+                    .foregroundColor(isSelected ? .white : Color.adaptivePrimaryText(colorScheme))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? Color(hex: topic.color) : Color.white.opacity(0.08))
+                RoundedRectangle(cornerRadius: CornerRadius.full)
+                    .fill(isSelected ? Color(hex: topic.color) : Color.adaptiveOverlay(colorScheme))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: CornerRadius.full)
                             .stroke(
                                 isSelected ? Color.clear : Color(hex: topic.color).opacity(0.3),
                                 lineWidth: 1

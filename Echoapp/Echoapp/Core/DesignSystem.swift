@@ -129,11 +129,59 @@ struct CornerRadius {
     static let medium: CGFloat = 12
     static let large: CGFloat = 16
     static let xlarge: CGFloat = 24
+    static let full: CGFloat = 100 // For pills and capsules
 }
 
 // MARK: - Shadow
 extension View {
-    func cardShadow() -> some View {
-        self.shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+    func cardShadow(_ colorScheme: ColorScheme = .dark) -> some View {
+        self.shadow(
+            color: colorScheme == .light
+                ? Color.black.opacity(0.06)
+                : Color.black.opacity(0.3),
+            radius: colorScheme == .light ? 12 : 8,
+            x: 0,
+            y: 4
+        )
+    }
+
+    func elevatedShadow(_ colorScheme: ColorScheme = .dark) -> some View {
+        self.shadow(
+            color: colorScheme == .light
+                ? Color.black.opacity(0.1)
+                : Color.black.opacity(0.4),
+            radius: colorScheme == .light ? 20 : 16,
+            x: 0,
+            y: 8
+        )
+    }
+}
+
+// MARK: - Adaptive Separator
+extension Color {
+    static func adaptiveSeparator(_ colorScheme: ColorScheme) -> Color {
+        colorScheme == .light
+            ? Color.black.opacity(0.08)
+            : Color.white.opacity(0.08)
+    }
+
+    static func adaptiveOverlay(_ colorScheme: ColorScheme) -> Color {
+        colorScheme == .light
+            ? Color.black.opacity(0.04)
+            : Color.white.opacity(0.04)
+    }
+}
+
+// MARK: - View Placeholder Extension
+extension View {
+    @ViewBuilder
+    func placeholder<Content: View>(
+        when shouldShow: Bool,
+        @ViewBuilder placeholder: () -> Content
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            placeholder().opacity(shouldShow ? 1 : 0)
+            self
+        }
     }
 }

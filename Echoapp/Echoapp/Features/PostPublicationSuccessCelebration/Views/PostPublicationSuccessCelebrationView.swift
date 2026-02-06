@@ -10,10 +10,11 @@ import SwiftUI
 struct PostPublicationSuccessCelebrationView: View {
     @ObservedObject var viewModel: PostPublicationSuccessCelebrationViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -26,10 +27,10 @@ struct PostPublicationSuccessCelebrationView: View {
                             dismiss()
                         }) {
                             Image(systemName: "xmark")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                                 .frame(width: 32, height: 32)
-                                .background(Color.appSecondaryBackground)
+                                .background(Color.adaptiveSecondaryBackground(colorScheme))
                                 .clipShape(Circle())
                         }
                     }
@@ -63,12 +64,12 @@ struct PostPublicationSuccessCelebrationView: View {
                     Text("Successfully Published!")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     // Description
                     Text("Your expert insights are now live on LinkedIn and reaching your network.")
                         .font(.body)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Spacing.xl)
                     
@@ -98,12 +99,12 @@ struct PostPublicationSuccessCelebrationView: View {
                                 
                                 Text("Founder Post Preview")
                                     .font(.caption)
-                                    .foregroundColor(.secondaryText)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             }
                             
                             Text(viewModel.postPreview)
                                 .font(.body)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .lineLimit(3)
                         }
                         .padding(Spacing.md)
@@ -114,7 +115,7 @@ struct PostPublicationSuccessCelebrationView: View {
                         .padding(.horizontal, Spacing.md)
                         .padding(.bottom, Spacing.md)
                     }
-                    .background(Color.appSecondaryBackground)
+                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                     .cornerRadius(CornerRadius.medium)
                     .padding(.horizontal, Spacing.md)
                     
@@ -127,17 +128,17 @@ struct PostPublicationSuccessCelebrationView: View {
                         VStack(alignment: .leading, spacing: Spacing.xs) {
                             Text("Visibility Tip")
                                 .font(.headline)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             
                             Text("Engaging with the first 3 comments can boost your reach by **20%**. Stay active to maximize impact!")
                                 .font(.body)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(Spacing.md)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.appSecondaryBackground)
+                    .background(Color.adaptiveSecondaryBackground(colorScheme))
                     .cornerRadius(CornerRadius.medium)
                     .padding(.horizontal, Spacing.md)
                     .padding(.bottom, Spacing.xl)

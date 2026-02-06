@@ -9,10 +9,11 @@ import SwiftUI
 
 struct SelectContentGoalView: View {
     @ObservedObject var viewModel: SelectContentGoalViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -20,12 +21,12 @@ struct SelectContentGoalView: View {
                 HStack {
                     Text("Onboarding")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Text("Step 2 of 5")
                         .font(.caption)
-                        .foregroundColor(.tertiaryText)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.top, Spacing.md)
@@ -34,7 +35,7 @@ struct SelectContentGoalView: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color.appSecondaryBackground)
+                            .fill(Color.adaptiveSecondaryBackground(colorScheme))
                             .frame(height: 6)
 
                         Rectangle()
@@ -53,12 +54,12 @@ struct SelectContentGoalView: View {
                             Text("Select Your Content Goal")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .multilineTextAlignment(.center)
                             
                             Text("Our AI will tailor your voice and strategy to your specific professional objectives.")
                                 .font(.body)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, Spacing.lg)
                         }
@@ -97,7 +98,8 @@ struct ContentGoalCard: View {
     let isSelected: Bool
     let isSuggested: Bool
     let action: () -> Void
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
@@ -118,7 +120,7 @@ struct ContentGoalCard: View {
                         Text(goal.title)
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         if isSuggested {
                             BadgeView("SUGGESTED")
@@ -128,7 +130,7 @@ struct ContentGoalCard: View {
                     
                     Text(goal.description)
                         .font(.body)
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 
@@ -137,7 +139,7 @@ struct ContentGoalCard: View {
                 // Radio Button
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? Color.appPrimary : Color.tertiaryText, lineWidth: 2)
+                        .stroke(isSelected ? Color.appPrimary : Color.adaptiveTertiaryText(colorScheme), lineWidth: 2)
                         .frame(width: 24, height: 24)
                     
                     if isSelected {
@@ -148,7 +150,7 @@ struct ContentGoalCard: View {
                 }
             }
             .padding(Spacing.lg)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.medium)

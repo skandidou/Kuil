@@ -8,16 +8,17 @@
 import SwiftUI
 
 struct CardView<Content: View>: View {
+    @Environment(\.colorScheme) var colorScheme
     let content: Content
-    
+
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(Spacing.md)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
     }
 }
@@ -25,8 +26,6 @@ struct CardView<Content: View>: View {
 #Preview {
     CardView {
         Text("Card Content")
-            .foregroundColor(.primaryText)
     }
     .padding()
-    .background(Color.appBackground)
 }

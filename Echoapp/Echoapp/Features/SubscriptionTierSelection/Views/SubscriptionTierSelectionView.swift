@@ -9,10 +9,11 @@ import SwiftUI
 
 struct SubscriptionTierSelectionView: View {
     @ObservedObject var viewModel: SubscriptionTierSelectionViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             ScrollView {
@@ -23,13 +24,13 @@ struct SubscriptionTierSelectionView: View {
                             viewModel.back()
                         }) {
                             Image(systemName: "arrow.left")
-                                .foregroundColor(.primaryText)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                                 .font(.headline)
                         }
                         
                         Text("Subscription Plans")
                             .font(.headline)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .frame(maxWidth: .infinity)
                         
                         Spacer()
@@ -42,11 +43,11 @@ struct SubscriptionTierSelectionView: View {
                         Text("Elevate Your Authority")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         Text("Select a plan to scale your personal brand on LinkedIn with AI.")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.lg)
                     }
@@ -101,14 +102,14 @@ struct SubscriptionTierSelectionView: View {
                     VStack(spacing: Spacing.md) {
                         Text("CANCEL ANYTIME. 100% SECURE.")
                             .font(.caption)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         
                         HStack(spacing: Spacing.lg) {
                             Image(systemName: "lock.fill")
                             Image(systemName: "doc.text.fill")
                             Image(systemName: "shield.fill")
                         }
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         .font(.callout)
                         
                         PrimaryButton("Start 7-Day Free Trial") {
@@ -118,7 +119,7 @@ struct SubscriptionTierSelectionView: View {
                         
                         Text("By subscribing, you agree to our Terms & Privacy Policy. Checkout secured via Apple App Store.")
                             .font(.caption2)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.xl)
                     }
@@ -136,6 +137,7 @@ struct SubscriptionCard: View {
     let isSelected: Bool
     var isPopular: Bool = false
     let action: () -> Void
+    @Environment(\.colorScheme) var colorScheme
     
     var price: String {
         let monthlyPrice = tier.monthlyPrice
@@ -155,7 +157,7 @@ struct SubscriptionCard: View {
                     Text(tier.name)
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     
                     Spacer()
                 }
@@ -163,7 +165,7 @@ struct SubscriptionCard: View {
                 Text(price)
                     .font(.title)
                     .fontWeight(.bold)
-                    .foregroundColor(.primaryText)
+                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -175,14 +177,14 @@ struct SubscriptionCard: View {
                             
                             Text(feature)
                                 .font(.body)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                         }
                     }
                 }
             }
             .padding(Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.appSecondaryBackground)
+            .background(Color.adaptiveSecondaryBackground(colorScheme))
             .cornerRadius(CornerRadius.medium)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.medium)

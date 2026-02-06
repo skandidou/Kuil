@@ -43,21 +43,31 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
         Double(currentStep) / Double(totalSteps)
     }
 
+    private var hasStartedGeneration = false
+
     init(isOnboarding: Bool = false) {
         self.isOnboarding = isOnboarding
         // Always 12 posts for comprehensive calibration
         totalSteps = 12
         currentStep = 1
+        // NOTE: Don't auto-generate posts here — wait for startIfNeeded()
+        // This prevents wasting an Opus API call when onboarding is already complete
+    }
 
-        // Generate AI posts for tone calibration
+    /// Call this when the calibration view actually appears (not on init)
+    func startIfNeeded() {
+        guard !hasStartedGeneration else { return }
+        hasStartedGeneration = true
+        // Set loading state immediately (synchronous) so the UI shows spinner right away
+        isLoading = true
+        currentQuote = "Generating personalized posts..."
         Task {
             await generateAIPosts()
         }
     }
 
     func generateAIPosts() async {
-        isLoading = true
-        currentQuote = "Generating personalized posts..."
+        // isLoading and currentQuote already set by startIfNeeded()
 
         do {
             print("🤖 Generating \(totalSteps) AI posts for tone calibration...")

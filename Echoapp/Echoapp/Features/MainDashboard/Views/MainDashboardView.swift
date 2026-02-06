@@ -16,38 +16,44 @@ struct MainDashboardView: View {
     @State private var showAnalytics = false
     @State private var showProfile = false
 
+    // Persist ViewModels with @StateObject to prevent recreation on body re-evaluation
+    @StateObject private var calendarViewModel = ContentCalendarSchedulingViewModel()
+    @StateObject private var createViewModel = CreateContentSourceSelectionViewModel()
+    @StateObject private var analyticsViewModel = AnalyticsVisibilityInsightsViewModel()
+    @StateObject private var profileViewModel = UserProfileVoiceSettingsViewModel()
+
     var body: some View {
         ZStack {
             Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
-            
+
             TabView(selection: $selectedTab) {
                 DashboardHomeView(viewModel: viewModel)
                     .tabItem {
                         Label("Home", systemImage: "house.fill")
                     }
                     .tag(MainTab.home)
-                
-                ContentCalendarSchedulingView(viewModel: ContentCalendarSchedulingViewModel())
+
+                ContentCalendarSchedulingView(viewModel: calendarViewModel)
                     .tabItem {
                         Label("Calendar", systemImage: "calendar")
                     }
                     .tag(MainTab.calendar)
-                
+
                 // Create tab shows the create content screen
-                CreateContentSourceSelectionView(viewModel: CreateContentSourceSelectionViewModel())
+                CreateContentSourceSelectionView(viewModel: createViewModel)
                     .tabItem {
                         Label("Create", systemImage: "plus.circle.fill")
                     }
                     .tag(MainTab.create)
-                
-                AnalyticsVisibilityInsightsView(viewModel: AnalyticsVisibilityInsightsViewModel())
+
+                AnalyticsVisibilityInsightsView(viewModel: analyticsViewModel)
                     .tabItem {
                         Label("Analytics", systemImage: "chart.line.uptrend.xyaxis")
                     }
                     .tag(MainTab.analytics)
-                
-                UserProfileVoiceSettingsView(viewModel: UserProfileVoiceSettingsViewModel())
+
+                UserProfileVoiceSettingsView(viewModel: profileViewModel)
                     .tabItem {
                         Label("Profile", systemImage: "person.fill")
                     }
@@ -64,65 +70,68 @@ struct DashboardHomeView: View {
     @State private var showNotifications = false
     @State private var showCreateContent = false
 
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "Good morning"
+        case 12..<18: return "Good afternoon"
+        default: return "Good evening"
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.xl) {
                     // Header
                     HStack {
-                        HStack(spacing: Spacing.sm) {
+                        HStack(spacing: Spacing.md) {
                             Circle()
-                                .fill(viewModel.roleColor.opacity(0.2))
-                                .frame(width: 40, height: 40)
+                                .fill(viewModel.roleColor.opacity(0.15))
+                                .frame(width: 44, height: 44)
                                 .overlay(
                                     Text(String(viewModel.userName.prefix(1)).uppercased())
                                         .font(.headline)
+                                        .fontWeight(.bold)
                                         .foregroundColor(viewModel.roleColor)
                                 )
 
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
                                 Text(viewModel.userRole.uppercased())
                                     .font(.caption2)
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.bold)
                                     .foregroundColor(viewModel.roleColor)
                                     .lineLimit(1)
 
-                                Text("Good morning, \(viewModel.userName)")
+                                Text(greetingText + ", \(viewModel.userName)")
                                     .font(.headline)
                                     .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             }
                         }
-                        
-                        Spacer()
-                        
-                        HStack(spacing: Spacing.md) {
-                            Button(action: {
-                                showCreateContent = true
-                            }) {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                                    .font(.headline)
-                            }
 
+                        Spacer()
+
+                        HStack(spacing: Spacing.md) {
                             Button(action: {
                                 showNotifications = true
                             }) {
                                 ZStack(alignment: .topTrailing) {
                                     Image(systemName: "bell")
                                         .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                                        .font(.headline)
-                                    
+                                        .font(.body)
+
                                     if viewModel.hasUnreadNotifications {
                                         Circle()
-                                            .fill(Color.appPrimary)
-                                            .frame(width: 8, height: 8)
-                                            .offset(x: 4, y: -4)
+                                            .fill(Color.errorRed)
+                                            .frame(width: 7, height: 7)
+                                            .offset(x: 3, y: -3)
                                     }
                                 }
+                                .frame(width: 44, height: 44)
                             }
                         }
                     }
-                    .padding(.horizontal, Spacing.md)
+                    .padding(.horizontal, Spacing.lg)
                     .padding(.top, Spacing.md)
                     
                     // Network Visibility Score
@@ -211,6 +220,102 @@ struct DashboardHomeView: View {
                     }
                     .padding(.vertical, Spacing.lg)
                     
+                    // Quick Stats Row
+                    if let stats = viewModel.quickStats, stats.publishedPosts > 0 {
+                        HStack(spacing: Spacing.md) {
+                            QuickStatCard(
+                                title: "Published",
+                                value: "\(stats.publishedPosts)",
+                                icon: "checkmark.circle.fill",
+                                color: .successGreen,
+                                colorScheme: colorScheme
+                            )
+                            QuickStatCard(
+                                title: "Avg Hook",
+                                value: "\(stats.averageHookScore)",
+                                icon: "sparkles",
+                                color: .appPrimary,
+                                colorScheme: colorScheme
+                            )
+                            QuickStatCard(
+                                title: "Total",
+                                value: "\(stats.totalPosts)",
+                                icon: "doc.text.fill",
+                                color: .accentCyan,
+                                colorScheme: colorScheme
+                            )
+                        }
+                        .padding(.horizontal, Spacing.md)
+                    }
+
+                    // Best Time to Post
+                    if let bestTime = viewModel.bestTime {
+                        HStack(spacing: Spacing.md) {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(.appPrimary)
+                                .font(.title3)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("BEST TIME TO POST")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+
+                                Text("\(bestTime.dayName) at \(bestTime.hourFormatted)")
+                                    .font(.headline)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                            }
+
+                            Spacer()
+
+                            Text("\(bestTime.score)%")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.appPrimary)
+                        }
+                        .padding(Spacing.md)
+                        .background(Color.appPrimary.opacity(0.08))
+                        .cornerRadius(CornerRadius.medium)
+                        .padding(.horizontal, Spacing.md)
+                    }
+
+                    // Success Patterns
+                    if !viewModel.successPatterns.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.md) {
+                            Text("Your Winning Formula")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                                .padding(.horizontal, Spacing.md)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Spacing.sm) {
+                                    ForEach(viewModel.successPatterns) { pattern in
+                                        VStack(spacing: Spacing.xs) {
+                                            Text(patternIcon(pattern.type))
+                                                .font(.title2)
+
+                                            Text(formatPatternValue(pattern.value))
+                                                .font(.caption)
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                                                .lineLimit(1)
+
+                                            Text("\(pattern.successRate)% success")
+                                                .font(.caption2)
+                                                .foregroundColor(.successGreen)
+                                        }
+                                        .padding(Spacing.md)
+                                        .frame(width: 100)
+                                        .background(Color.adaptiveSecondaryBackground(colorScheme))
+                                        .cornerRadius(CornerRadius.medium)
+                                    }
+                                }
+                                .padding(.horizontal, Spacing.md)
+                            }
+                        }
+                    }
+
                     // Daily Inspiration
                     VStack(alignment: .leading, spacing: Spacing.md) {
                         HStack {
@@ -423,6 +528,62 @@ struct ScheduledItemCard: View {
                 isAppeared = true
             }
         }
+    }
+}
+
+struct QuickStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        VStack(spacing: Spacing.xs) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.md)
+        .background(Color.adaptiveSecondaryBackground(colorScheme))
+        .cornerRadius(CornerRadius.medium)
+    }
+}
+
+private func patternIcon(_ type: String) -> String {
+    switch type {
+    case "hook_style": return "🎣"
+    case "length": return "📏"
+    case "structure": return "📋"
+    case "emoji_usage": return "😊"
+    default: return "✨"
+    }
+}
+
+private func formatPatternValue(_ value: String) -> String {
+    switch value {
+    case "question": return "Questions"
+    case "personal": return "Personal"
+    case "number": return "Numbers"
+    case "short": return "Short"
+    case "medium": return "Medium"
+    case "long": return "Long"
+    case "numbered_list": return "Lists"
+    case "bullet_list": return "Bullets"
+    case "none": return "No Emoji"
+    case "minimal": return "Few Emoji"
+    case "moderate": return "Some Emoji"
+    default: return value.capitalized
     }
 }
 

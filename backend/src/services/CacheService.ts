@@ -19,6 +19,7 @@ class CacheServiceClass {
   private memoryCache: Map<string, CacheItem> = new Map();
   private isRedisConnected: boolean = false;
   private connectionAttempted: boolean = false;
+  private memoryCleanupInterval: NodeJS.Timeout | null = null;
 
   /**
    * Initialize Redis connection
@@ -83,7 +84,11 @@ class CacheServiceClass {
    * Start periodic cleanup of expired memory cache entries
    */
   private startMemoryCleanup(): void {
-    setInterval(() => {
+    if (this.memoryCleanupInterval) {
+      clearInterval(this.memoryCleanupInterval);
+    }
+
+    this.memoryCleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [key, item] of this.memoryCache.entries()) {
         if (now > item.expiry) {
@@ -289,6 +294,11 @@ class CacheServiceClass {
    * Graceful shutdown
    */
   async shutdown(): Promise<void> {
+    if (this.memoryCleanupInterval) {
+      clearInterval(this.memoryCleanupInterval);
+      this.memoryCleanupInterval = null;
+    }
+
     if (this.redis) {
       await this.redis.quit();
       Logger.info('CACHE', 'Redis connection closed gracefully');

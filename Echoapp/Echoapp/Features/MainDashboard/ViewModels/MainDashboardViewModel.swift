@@ -25,6 +25,25 @@ struct ScheduledItemModel: Identifiable {
     let schedule: String
 }
 
+struct SuccessPatternModel: Identifiable {
+    let id = UUID()
+    let type: String
+    let value: String
+    let successRate: Int // 0-100
+}
+
+struct QuickStatsModel {
+    let totalPosts: Int
+    let publishedPosts: Int
+    let averageHookScore: Int
+}
+
+struct BestTimeModel {
+    let dayName: String
+    let hourFormatted: String
+    let score: Int
+}
+
 @MainActor
 class MainDashboardViewModel: ObservableObject {
     @Published var userName: String = "Loading..."
@@ -36,6 +55,9 @@ class MainDashboardViewModel: ObservableObject {
     @Published var hasUnreadNotifications: Bool = true
     @Published var inspirationCards: [InspirationCardModel] = []
     @Published var nextScheduledItem: ScheduledItemModel?
+    @Published var successPatterns: [SuccessPatternModel] = []
+    @Published var quickStats: QuickStatsModel?
+    @Published var bestTime: BestTimeModel?
 
     private var cancellables = Set<AnyCancellable>()
     private var previousVisibilityScore: Int?
@@ -97,16 +119,123 @@ class MainDashboardViewModel: ObservableObject {
                     let stats = try await UserService.shared.fetchStats()
                     await MainActor.run {
                         AppState.shared.userStats = stats
+                        self.quickStats = QuickStatsModel(
+                            totalPosts: stats.totalPosts,
+                            publishedPosts: stats.publishedPosts,
+                            averageHookScore: stats.averageHookScore
+                        )
                     }
                 } catch {
                     print("Failed to load stats: \(error)")
                 }
             }
+        } else if let stats = AppState.shared.userStats {
+            self.quickStats = QuickStatsModel(
+                totalPosts: stats.totalPosts,
+                publishedPosts: stats.publishedPosts,
+                averageHookScore: stats.averageHookScore
+            )
         }
 
         // Load AI-generated daily inspirations
         Task {
             await loadDailyInspirations()
+        }
+
+        // Load success patterns
+        Task {
+            await loadSuccessPatterns()
+        }
+
+        // Load best posting time
+        Task {
+            await loadBestTime()
+        }
+
+        // Load real score change from analytics
+        Task {
+            await loadScoreChange()
+        }
+    }
+
+    func loadSuccessPatterns() async {
+        do {
+            struct PatternsResponse: Codable {
+                let patterns: [PatternData]
+            }
+            struct PatternData: Codable {
+                let type: String
+                let value: String
+                let successRate: Double
+            }
+
+            let response: PatternsResponse = try await APIClient.shared.get(
+                endpoint: "/api/voice/success-patterns",
+                requiresAuth: true
+            )
+
+            await MainActor.run {
+                self.successPatterns = response.patterns.prefix(3).map { pattern in
+                    SuccessPatternModel(
+                        type: pattern.type,
+                        value: pattern.value,
+                        successRate: Int(pattern.successRate * 100)
+                    )
+                }
+            }
+        } catch {
+            print("Failed to load success patterns: \(error)")
+        }
+    }
+
+    func loadBestTime() async {
+        do {
+            struct BestTimesResponse: Codable {
+                let topSlots: [TopSlot]?
+            }
+            struct TopSlot: Codable {
+                let dayName: String
+                let hourFormatted: String
+                let score: Int
+            }
+
+            let response: BestTimesResponse = try await APIClient.shared.get(
+                endpoint: "/api/analytics/best-times",
+                requiresAuth: true
+            )
+
+            if let topSlot = response.topSlots?.first {
+                await MainActor.run {
+                    self.bestTime = BestTimeModel(
+                        dayName: topSlot.dayName,
+                        hourFormatted: topSlot.hourFormatted,
+                        score: topSlot.score
+                    )
+                }
+            }
+        } catch {
+            print("Failed to load best time: \(error)")
+        }
+    }
+
+    func loadScoreChange() async {
+        do {
+            struct AnalyticsResponse: Codable {
+                let scoreChange: Double?
+            }
+
+            let response: AnalyticsResponse = try await APIClient.shared.get(
+                endpoint: "/api/analytics",
+                requiresAuth: true
+            )
+
+            if let change = response.scoreChange {
+                await MainActor.run {
+                    self.scoreChange = change
+                }
+            }
+        } catch {
+            print("Failed to load score change: \(error)")
         }
     }
 
@@ -122,7 +251,7 @@ class MainDashboardViewModel: ObservableObject {
             struct ScheduledPostItem: Codable {
                 let id: String
                 let content: String
-                let scheduledAt: String
+                let scheduledAt: String?  // Can be null for published posts without schedule
                 let status: String
             }
 
@@ -132,15 +261,15 @@ class MainDashboardViewModel: ObservableObject {
             )
 
             await MainActor.run {
-                // Get next upcoming scheduled post (not published)
-                if let nextPost = response.posts.first(where: { $0.status == "scheduled" }) {
+                // Get next upcoming scheduled post (not published) - must have a scheduledAt date
+                if let nextPost = response.posts.first(where: { $0.status == "scheduled" && $0.scheduledAt != nil }) {
                     // Truncate content to ~25 chars for display
                     let truncatedTitle = String(nextPost.content.prefix(25)) + (nextPost.content.count > 25 ? "..." : "")
 
                     self.nextScheduledItem = ScheduledItemModel(
                         platform: "LINKEDIN SCHEDULE",
                         title: truncatedTitle,
-                        schedule: formatScheduleDate(nextPost.scheduledAt)
+                        schedule: formatScheduleDate(nextPost.scheduledAt!)
                     )
                     print("✅ Next scheduled post loaded: \(truncatedTitle)")
                 } else {

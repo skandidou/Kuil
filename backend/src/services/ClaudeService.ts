@@ -7,6 +7,7 @@ import {
 } from '../models/VoiceSignature';
 import { PostVariantResponse, GeneratePostResponse } from '../models/GeneratedPost';
 import { PersonalizationService } from './PersonalizationService';
+import { CacheService } from './CacheService';
 import {
   EnhancedUserContext,
   CalibrationContext,
@@ -1071,6 +1072,15 @@ Respond with ONLY valid JSON:
     trend: string;
     engagementPotential: number;
   }>> {
+    // Check cache first (24h TTL per user per day)
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = `daily-spark:${userId}:${today}`;
+    const cached = await CacheService.get<Array<{ title: string; description: string; trend: string; engagementPotential: number }>>(cacheKey);
+    if (cached) {
+      console.log(`✅ [CACHE HIT] Daily spark for user ${userId}`);
+      return cached;
+    }
+
     try {
       // Get user's voice signature for personalization
       const signatureResult = await query(
@@ -1147,7 +1157,13 @@ The engagementPotential should be 60-100 representing predicted engagement.`;
       const cleanedResponse = extractJSON(response);
       const parsed = JSON.parse(cleanedResponse);
 
-      return parsed.ideas || [];
+      const ideas = parsed.ideas || [];
+
+      // Cache for 24 hours (86400000 ms)
+      await CacheService.set(cacheKey, ideas, 86400000);
+      console.log(`💾 [CACHE SET] Daily spark cached for user ${userId}`);
+
+      return ideas;
     } catch (error) {
       console.error('[CLAUDE] Daily spark error:', error);
 
@@ -1184,6 +1200,15 @@ The engagementPotential should be 60-100 representing predicted engagement.`;
     subtitle: string;
     imageUrl: string;
   }>> {
+    // Check cache first (24h TTL per user per day)
+    const todayDate = new Date().toISOString().split('T')[0];
+    const inspirationCacheKey = `daily-inspirations:${userId}:${todayDate}`;
+    const cachedInspirations = await CacheService.get<Array<{ badge: string; title: string; subtitle: string; imageUrl: string }>>(inspirationCacheKey);
+    if (cachedInspirations) {
+      console.log(`✅ [CACHE HIT] Daily inspirations for user ${userId}`);
+      return cachedInspirations;
+    }
+
     try {
       const currentDate = new Date().toISOString().split('T')[0];
       const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
@@ -1247,6 +1272,10 @@ Badge options: "TECH TREND", "BUSINESS", "AI NEWS", "LEADERSHIP", "STARTUP", "CA
           imageUrl: `https://picsum.photos/seed/${seed}/560/280`,
         };
       });
+
+      // Cache for 24 hours (86400000 ms)
+      await CacheService.set(inspirationCacheKey, inspirations, 86400000);
+      console.log(`💾 [CACHE SET] Daily inspirations cached for user ${userId}`);
 
       return inspirations;
     } catch (error) {

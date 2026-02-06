@@ -10,30 +10,29 @@ import SwiftUI
 struct BadgeView: View {
     let text: String
     let color: Color
-    
-    init(_ text: String, color: Color = .accentBlue) {
+
+    init(_ text: String, color: Color = .appPrimary) {
         self.text = text
         self.color = color
     }
-    
+
     var body: some View {
         Text(text)
-            .font(.caption)
-            .fontWeight(.semibold)
+            .font(.caption2)
+            .fontWeight(.bold)
             .foregroundColor(.white)
             .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, 4)
+            .padding(.vertical, Spacing.xs)
             .background(color)
             .cornerRadius(CornerRadius.small)
     }
 }
 
 #Preview {
-    HStack(spacing: 8) {
+    HStack(spacing: Spacing.sm) {
         BadgeView("AI TREND")
         BadgeView("AUTH", color: .accentLightBlue)
         BadgeView("TRENDING", color: .successGreen)
     }
     .padding()
-    .background(Color.appBackground)
 }

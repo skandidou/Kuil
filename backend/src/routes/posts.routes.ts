@@ -3,6 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { query } from '../config/database';
 import { LinkedInService } from '../services/LinkedInService';
 import { SchedulerService } from '../services/SchedulerService';
+import { CacheService } from '../services/CacheService';
 
 const router = Router();
 
@@ -231,6 +232,14 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
  */
 router.get('/optimal-time', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    // Check cache first (6h TTL)
+    const optimalTimeCacheKey = `optimal-time:${req.userId}`;
+    const cachedResult = await CacheService.get<{ suggestedTime: string; reason: string }>(optimalTimeCacheKey);
+    if (cachedResult) {
+      console.log(`✅ [CACHE HIT] Optimal time for user ${req.userId}`);
+      return res.json(cachedResult);
+    }
+
     console.log(`🤖 Calculating optimal posting time for user ${req.userId}...`);
 
     // Get user's post performance history
@@ -316,10 +325,13 @@ Respond with ONLY valid JSON:
 
         console.log(`✅ AI optimal time: ${aiAnalysis.suggestedDay} ${aiAnalysis.suggestedTime}`);
 
-        return res.json({
+        const optimalResult = {
           suggestedTime: `${aiAnalysis.suggestedDay} at ${aiAnalysis.suggestedTime}`,
           reason: aiAnalysis.reason
-        });
+        };
+        // Cache for 6 hours (21600000 ms)
+        await CacheService.set(optimalTimeCacheKey, optimalResult, 21600000);
+        return res.json(optimalResult);
       } catch (aiError) {
         console.error('AI analysis failed, falling back to data-based recommendation:', aiError);
         // Fall back to simple data-based recommendation
@@ -327,10 +339,13 @@ Respond with ONLY valid JSON:
         const period = best.hour >= 12 ? 'PM' : 'AM';
         const displayHour = best.hour % 12 || 12;
 
-        return res.json({
+        const fallbackResult = {
           suggestedTime: `${days[best.dayOfWeek]} at ${displayHour}:00 ${period}`,
           reason: `Your posts on ${days[best.dayOfWeek]} at this time average ${best.avgEngagement.toFixed(0)} engagement points`
-        });
+        };
+        // Cache data-based fallback for 6 hours
+        await CacheService.set(optimalTimeCacheKey, fallbackResult, 21600000);
+        return res.json(fallbackResult);
       }
     }
 
@@ -361,13 +376,16 @@ Respond with ONLY valid JSON:
 
       console.log(`✅ AI optimal time (no history): ${aiAnalysis.suggestedDay} ${aiAnalysis.suggestedTime}`);
 
-      res.json({
+      const noHistoryResult = {
         suggestedTime: `${aiAnalysis.suggestedDay} at ${aiAnalysis.suggestedTime}`,
         reason: aiAnalysis.reason
-      });
+      };
+      // Cache for 6 hours
+      await CacheService.set(optimalTimeCacheKey, noHistoryResult, 21600000);
+      res.json(noHistoryResult);
     } catch (aiError) {
       console.error('AI fallback failed:', aiError);
-      // Ultimate fallback
+      // Ultimate fallback - NOT cached (generic, and we want to retry AI next time)
       res.json({
         suggestedTime: 'Tuesday at 10:00 AM',
         reason: 'Based on LinkedIn best practices for maximum professional engagement'

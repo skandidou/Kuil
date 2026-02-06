@@ -7,6 +7,10 @@
 //
 
 import SwiftUI
+import PhotosUI
+import PDFKit
+import Vision
+import UniformTypeIdentifiers
 
 struct SmartAIEditorView: View {
     @ObservedObject var viewModel: SmartAIEditorHookScorerViewModel
@@ -15,6 +19,15 @@ struct SmartAIEditorView: View {
     @FocusState private var isInputFocused: Bool
     @State private var inputText: String = ""
     @State private var showSuccessAnimation = false
+
+    // CV Upload states
+    @State private var showDocumentPicker = false
+    @State private var showPhotoPicker = false
+    @State private var showCamera = false
+    @State private var cvFileName: String?
+    @State private var cvExtractedText: String?
+    @State private var isExtractingText = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     var body: some View {
         ZStack {
@@ -237,8 +250,8 @@ struct SmartAIEditorView: View {
                 ideaInputField
             }
 
-            // Generate button
-            if !inputText.isEmpty || viewModel.sourceType == "From CV" {
+            // Generate button (show when text entered or CV extracted)
+            if !inputText.isEmpty && !(viewModel.sourceType == "From CV" && cvExtractedText == nil) {
                 generateButton
             }
         }
@@ -315,24 +328,15 @@ struct SmartAIEditorView: View {
 
     private var cvUploadSection: some View {
         VStack(spacing: Spacing.md) {
-            // Upload button
-            Button(action: {
-                // TODO: Implement file picker
-                inputText = "cv_uploaded"
-            }) {
+            if isExtractingText {
+                // Extracting text indicator
                 VStack(spacing: Spacing.md) {
-                    Image(systemName: "doc.badge.arrow.up")
-                        .font(.system(size: 40))
-                        .foregroundColor(.accentCyan)
-
-                    Text(inputText == "cv_uploaded" ? "CV Uploaded ✓" : "Tap to upload your CV")
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.accentCyan)
+                    Text("Extracting text from your CV...")
                         .font(.callout)
-                        .fontWeight(.medium)
-                        .foregroundColor(inputText == "cv_uploaded" ? .successGreen : .primaryText)
-
-                    Text("PDF, DOC, or DOCX")
-                        .font(.caption)
-                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.xl)
@@ -340,17 +344,256 @@ struct SmartAIEditorView: View {
                 .cornerRadius(CornerRadius.medium)
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.medium)
-                        .stroke(
-                            style: StrokeStyle(lineWidth: 2, dash: [8, 4])
-                        )
-                        .foregroundColor(inputText == "cv_uploaded" ? .successGreen : .accentCyan.opacity(0.5))
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
+                        .foregroundColor(.accentCyan.opacity(0.5))
                 )
+
+            } else if let fileName = cvFileName, cvExtractedText != nil {
+                // CV uploaded successfully
+                VStack(spacing: Spacing.md) {
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.successGreen)
+
+                    Text("CV Uploaded ✓")
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .foregroundColor(.successGreen)
+
+                    Text(fileName)
+                        .font(.caption)
+                        .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                        .lineLimit(1)
+
+                    // Change file button
+                    Button(action: { resetCVUpload() }) {
+                        Text("Change file")
+                            .font(.caption)
+                            .foregroundColor(.accentCyan)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.xl)
+                .background(Color.adaptiveBackground(colorScheme))
+                .cornerRadius(CornerRadius.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: CornerRadius.medium)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
+                        .foregroundColor(.successGreen)
+                )
+
+            } else {
+                // Upload options
+                VStack(spacing: Spacing.md) {
+                    Image(systemName: "doc.badge.arrow.up")
+                        .font(.system(size: 40))
+                        .foregroundColor(.accentCyan)
+
+                    Text("Upload your CV")
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+
+                    Text("PDF, image, or take a photo")
+                        .font(.caption)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.lg)
+                .background(Color.adaptiveBackground(colorScheme))
+                .cornerRadius(CornerRadius.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: CornerRadius.medium)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
+                        .foregroundColor(.accentCyan.opacity(0.5))
+                )
+
+                // Three upload option buttons
+                HStack(spacing: Spacing.sm) {
+                    // Browse files (PDF/DOC)
+                    Button(action: { showDocumentPicker = true }) {
+                        VStack(spacing: 6) {
+                            Image(systemName: "folder.fill")
+                                .font(.title3)
+                            Text("Files")
+                                .font(.caption2)
+                        }
+                        .foregroundColor(.accentCyan)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.md)
+                        .background(Color.accentCyan.opacity(0.1))
+                        .cornerRadius(CornerRadius.medium)
+                    }
+
+                    // Photo library
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        VStack(spacing: 6) {
+                            Image(systemName: "photo.fill")
+                                .font(.title3)
+                            Text("Gallery")
+                                .font(.caption2)
+                        }
+                        .foregroundColor(.appPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.md)
+                        .background(Color.appPrimary.opacity(0.1))
+                        .cornerRadius(CornerRadius.medium)
+                    }
+
+                    // Camera
+                    Button(action: { showCamera = true }) {
+                        VStack(spacing: 6) {
+                            Image(systemName: "camera.fill")
+                                .font(.title3)
+                            Text("Camera")
+                                .font(.caption2)
+                        }
+                        .foregroundColor(.warningYellow)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.md)
+                        .background(Color.warningYellow.opacity(0.1))
+                        .cornerRadius(CornerRadius.medium)
+                    }
+                }
             }
 
             Text("AI will transform your CV into a compelling LinkedIn post")
                 .font(.caption)
                 .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                 .multilineTextAlignment(.center)
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPickerView { url in
+                handlePickedDocument(url: url)
+            }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPickerView { image in
+                handleCapturedImage(image)
+            }
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            guard !isExtractingText else { return } // Prevent re-entrancy
+            Task { @MainActor in
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    handleCapturedImage(image)
+                }
+                selectedPhotoItem = nil // Reset to allow re-selection
+            }
+        }
+    }
+
+    // MARK: - CV Helper Methods
+
+    private func resetCVUpload() {
+        cvFileName = nil
+        cvExtractedText = nil
+        inputText = ""
+    }
+
+    private func handlePickedDocument(url: URL) {
+        isExtractingText = true
+        cvFileName = url.lastPathComponent
+
+        Task {
+            let text = await extractTextFromDocument(url: url)
+            await MainActor.run {
+                if let text, !text.isEmpty {
+                    cvExtractedText = text
+                    inputText = text
+                    print("✅ CV text extracted: \(text.prefix(200))...")
+                } else {
+                    cvFileName = nil
+                    cvExtractedText = nil
+                    print("❌ Could not extract text from CV")
+                }
+                isExtractingText = false
+            }
+        }
+    }
+
+    private func handleCapturedImage(_ image: UIImage) {
+        isExtractingText = true
+        cvFileName = "Photo CV"
+
+        Task {
+            let text = await extractTextFromImage(image)
+            // Ensure state updates happen on main thread
+            await MainActor.run {
+                if let text, !text.isEmpty {
+                    cvExtractedText = text
+                    inputText = text
+                    print("✅ CV text extracted from image: \(text.prefix(200))...")
+                } else {
+                    cvFileName = nil
+                    cvExtractedText = nil
+                    print("❌ Could not extract text from image")
+                }
+                isExtractingText = false
+            }
+        }
+    }
+
+    private func extractTextFromDocument(url: URL) async -> String? {
+        // Start accessing the security-scoped resource
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        // Try PDF extraction first
+        if let pdfDoc = PDFDocument(url: url) {
+            var fullText = ""
+            for i in 0..<pdfDoc.pageCount {
+                if let page = pdfDoc.page(at: i), let pageText = page.string {
+                    fullText += pageText + "\n"
+                }
+            }
+            if !fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return fullText
+            }
+        }
+
+        // Try reading as plain text (DOC/DOCX fallback)
+        if let data = try? Data(contentsOf: url) {
+            // Try attributed string for DOC/DOCX/RTF
+            if let attrStr = try? NSAttributedString(data: data, options: [
+                .documentType: NSAttributedString.DocumentType.rtf
+            ], documentAttributes: nil) {
+                return attrStr.string
+            }
+
+            // Plain text fallback
+            if let plainText = String(data: data, encoding: .utf8) {
+                return plainText
+            }
+        }
+
+        return nil
+    }
+
+    private func extractTextFromImage(_ image: UIImage) async -> String? {
+        guard let cgImage = image.cgImage else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            let request = VNRecognizeTextRequest { request, error in
+                guard let observations = request.results as? [VNRecognizedTextObservation] else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let text = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+                continuation.resume(returning: text.isEmpty ? nil : text)
+            }
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["fr-FR", "en-US"]
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                print("❌ Vision OCR failed: \(error)")
+                continuation.resume(returning: nil)
+            }
         }
     }
 
@@ -632,6 +875,80 @@ struct SmartAIEditorView: View {
             .shadow(radius: 30)
         }
         .transition(.scale.combined(with: .opacity))
+    }
+}
+
+// MARK: - Document Picker (PDF, DOC, DOCX)
+
+struct DocumentPickerView: UIViewControllerRepresentable {
+    var onPick: (URL) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let types: [UTType] = [.pdf, .rtf, .plainText, .text]
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick)
+    }
+
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        var onPick: (URL) -> Void
+
+        init(onPick: @escaping (URL) -> Void) {
+            self.onPick = onPick
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+            onPick(url)
+        }
+    }
+}
+
+// MARK: - Camera Picker
+
+struct CameraPickerView: UIViewControllerRepresentable {
+    var onCapture: (UIImage) -> Void
+    @Environment(\.dismiss) var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCapture: onCapture, dismiss: dismiss)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        var onCapture: (UIImage) -> Void
+        var dismiss: DismissAction
+
+        init(onCapture: @escaping (UIImage) -> Void, dismiss: DismissAction) {
+            self.onCapture = onCapture
+            self.dismiss = dismiss
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                onCapture(image)
+            }
+            dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
     }
 }
 

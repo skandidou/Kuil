@@ -19,30 +19,13 @@ struct AnalyticsVisibilityInsightsView: View {
             ScrollView {
                 VStack(spacing: Spacing.xl) {
                     // Header
-                    HStack {
-                        Button(action: {
-                            viewModel.back()
-                        }) {
-                            Image(systemName: "arrow.left")
-                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                                .font(.headline)
-                        }
-
-                        Text("Visibility Insights")
-                            .font(.headline)
-                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                            .frame(maxWidth: .infinity)
-                        
-                        Button(action: {
-                            viewModel.showCalendar()
-                        }) {
-                            Image(systemName: "calendar")
-                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                                .font(.headline)
-                        }
-                    }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.top, Spacing.md)
+                    Text("Visibility Insights")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.top, Spacing.md)
                     
                     // Re-auth banner if needed
                     if viewModel.needsReauth {
@@ -111,6 +94,7 @@ struct AnalyticsVisibilityInsightsView: View {
                         // Key metrics grid
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
+                            GridItem(.flexible()),
                             GridItem(.flexible())
                         ], spacing: Spacing.md) {
                             MetricCard(
@@ -140,8 +124,38 @@ struct AnalyticsVisibilityInsightsView: View {
                                 value: viewModel.formatNumber(viewModel.totalReactions),
                                 colorScheme: colorScheme
                             )
+
+                            MetricCard(
+                                icon: "bubble.left.fill",
+                                label: "Comments",
+                                value: viewModel.formatNumber(viewModel.totalComments),
+                                colorScheme: colorScheme
+                            )
+
+                            MetricCard(
+                                icon: "arrow.2.squarepath",
+                                label: "Reshares",
+                                value: viewModel.formatNumber(viewModel.totalReshares),
+                                colorScheme: colorScheme
+                            )
                         }
                         .padding(.top, Spacing.sm)
+
+                        // Members Reached
+                        if viewModel.totalMembersReached > 0 {
+                            HStack {
+                                Image(systemName: "person.3.fill")
+                                    .foregroundColor(.appPrimary)
+                                    .font(.caption)
+                                Text("Members Reached:")
+                                    .font(.caption)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                                Text(viewModel.formatNumber(viewModel.totalMembersReached))
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.appPrimary)
+                            }
+                        }
 
                         // Engagement rate
                         if viewModel.engagementRate > 0 {
@@ -281,22 +295,27 @@ struct MetricCard: View {
 
     var body: some View {
         VStack(spacing: Spacing.xs) {
-            HStack(spacing: Spacing.xs) {
+            HStack(spacing: 2) {
                 Image(systemName: icon)
                     .foregroundColor(.appPrimary)
-                    .font(.caption)
+                    .font(.caption2)
                 Text(label)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             Text(value)
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .padding(Spacing.md)
+        .padding(.vertical, Spacing.sm)
+        .padding(.horizontal, Spacing.xs)
         .background(Color.adaptiveBackground(colorScheme))
         .cornerRadius(CornerRadius.small)
     }
@@ -465,20 +484,32 @@ struct TopPostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            RoundedRectangle(cornerRadius: CornerRadius.medium)
-                .fill(Color.appPrimary.opacity(0.2))
-                .frame(width: 200, height: 120)
-                .overlay(
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.appPrimary.opacity(0.5))
-                )
-
+            // Post content preview
             Text(post.title)
-                .font(.body)
+                .font(.callout)
                 .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                .lineLimit(2)
-            
+                .lineLimit(4)
+                .frame(width: 200, height: 80, alignment: .topLeading)
+
+            Divider()
+
+            // Impressions (main ranking metric)
+            if let impressions = post.impressions {
+                HStack(spacing: 4) {
+                    Image(systemName: "eye.fill")
+                        .foregroundColor(.appPrimary)
+                        .font(.caption)
+                    Text(impressions)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.appPrimary)
+                    Text("impressions")
+                        .font(.caption2)
+                        .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+                }
+            }
+
+            // Likes + Comments
             HStack(spacing: Spacing.md) {
                 HStack(spacing: 4) {
                     Image(systemName: "hand.thumbsup.fill")
@@ -488,7 +519,7 @@ struct TopPostCard: View {
                         .font(.caption)
                         .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                 }
-                
+
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.left.fill")
                         .foregroundColor(.appPrimary)

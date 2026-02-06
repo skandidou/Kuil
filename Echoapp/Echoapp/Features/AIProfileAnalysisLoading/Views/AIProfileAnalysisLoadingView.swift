@@ -9,10 +9,11 @@ import SwiftUI
 
 struct AIProfileAnalysisLoadingView: View {
     @ObservedObject var viewModel: AIProfileAnalysisLoadingViewModel
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         ZStack {
-            Color.appBackground
+            Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -22,13 +23,13 @@ struct AIProfileAnalysisLoadingView: View {
                         viewModel.cancel()
                     }) {
                         Image(systemName: "arrow.left")
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .font(.headline)
                     }
                     
                     Text("Onboarding")
                         .font(.headline)
-                        .foregroundColor(.primaryText)
+                        .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         .frame(maxWidth: .infinity)
                     
                     Spacer()
@@ -41,7 +42,7 @@ struct AIProfileAnalysisLoadingView: View {
                         // Progress Circle
                         ZStack {
                             Circle()
-                                .stroke(Color.appSecondaryBackground, lineWidth: 12)
+                                .stroke(Color.adaptiveSecondaryBackground(colorScheme), lineWidth: 12)
                                 .frame(width: 160, height: 160)
                             
                             Circle()
@@ -58,7 +59,7 @@ struct AIProfileAnalysisLoadingView: View {
                                 Text("\(Int(viewModel.progress * 100))%")
                                     .font(.title)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.primaryText)
+                                    .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             }
                         }
                         .padding(.top, Spacing.xxl)
@@ -67,12 +68,12 @@ struct AIProfileAnalysisLoadingView: View {
                         Text("Analyzing your profile...")
                             .font(.title)
                             .fontWeight(.bold)
-                            .foregroundColor(.primaryText)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                         
                         // Description
                         Text("Our AI is crafting a custom model based on your unique expertise. This usually takes less than 30 seconds.")
                             .font(.body)
-                            .foregroundColor(.secondaryText)
+                            .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Spacing.lg)
                         
@@ -84,21 +85,21 @@ struct AIProfileAnalysisLoadingView: View {
                             TaskRow(task: "Building VoiceSignature...", isCompleted: viewModel.progress > 0.9)
                         }
                         .padding(Spacing.md)
-                        .background(Color.appSecondaryBackground)
+                        .background(Color.adaptiveSecondaryBackground(colorScheme))
                         .cornerRadius(CornerRadius.medium)
                         .padding(.horizontal, Spacing.md)
-                        
+
                         // Deep Scan Status
                         VStack(spacing: Spacing.sm) {
                             Text("DEEP SCAN STATUS")
                                 .font(.caption)
-                                .foregroundColor(.tertiaryText)
+                                .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
                                     Rectangle()
-                                        .fill(Color.appSecondaryBackground)
+                                        .fill(Color.adaptiveSecondaryBackground(colorScheme))
                                         .frame(height: 8)
                                         .cornerRadius(4)
                                     
@@ -112,14 +113,14 @@ struct AIProfileAnalysisLoadingView: View {
                             
                             Text("Processing vectors...")
                                 .font(.caption)
-                                .foregroundColor(.secondaryText)
+                                .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(Spacing.md)
-                        .background(Color.appSecondaryBackground)
+                        .background(Color.adaptiveSecondaryBackground(colorScheme))
                         .cornerRadius(CornerRadius.medium)
                         .padding(.horizontal, Spacing.md)
-                        
+
                         // Cancel Button
                         SecondaryButton("Cancel Analysis") {
                             viewModel.cancel()
@@ -130,7 +131,7 @@ struct AIProfileAnalysisLoadingView: View {
                         // Security Footer
                         Text("SECURE DATA ENCRYPTION ACTIVE")
                             .font(.caption2)
-                            .foregroundColor(.tertiaryText)
+                            .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                             .padding(.top, Spacing.lg)
                     }
                     .padding(.vertical, Spacing.lg)
@@ -146,7 +147,8 @@ struct AIProfileAnalysisLoadingView: View {
 struct TaskRow: View {
     let task: String
     let isCompleted: Bool
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         HStack(spacing: Spacing.md) {
             if isCompleted {
@@ -156,7 +158,7 @@ struct TaskRow: View {
             } else {
                 if task.contains("Building") {
                     Circle()
-                        .stroke(Color.tertiaryText, lineWidth: 2)
+                        .stroke(Color.adaptiveTertiaryText(colorScheme), lineWidth: 2)
                         .frame(width: 24, height: 24)
                 } else {
                     ProgressView()
@@ -167,7 +169,7 @@ struct TaskRow: View {
             
             Text(task)
                 .font(.body)
-                .foregroundColor(isCompleted ? .primaryText : .secondaryText)
+                .foregroundColor(isCompleted ? Color.adaptivePrimaryText(colorScheme) : Color.adaptiveSecondaryText(colorScheme))
             
             Spacer()
         }
