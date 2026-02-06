@@ -30,6 +30,18 @@ const CLAUDE_SONNET = 'claude-sonnet-4-20250514'; // For medium complexity tasks
 const CLAUDE_HAIKU = 'claude-haiku-4-20250514'; // For simple/fast tasks
 
 /**
+ * Strip markdown formatting from AI-generated text.
+ * LinkedIn posts don't support markdown, so *italic* and **bold** must be removed.
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')  // **bold** and *italic*
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')      // __bold__ and _italic_
+    .replace(/#{1,6}\s/g, '')                     // # headings
+    .trim();
+}
+
+/**
  * Execute Claude call with timeout and retry logic
  * Implements exponential backoff: 1s, 2s, 4s
  */
@@ -315,7 +327,7 @@ Respond with ONLY a valid JSON object (no markdown, no code blocks):
 
       return {
         variants: generated.variants.map((v: any) => ({
-          content: v.content,
+          content: stripMarkdown(v.content),
           hookScore: v.hookScore,
         })),
       };
@@ -555,7 +567,7 @@ Now generate the LinkedIn post following all requirements above.`;
       console.log('✅ [CLAUDE] Post generated successfully, hook score:', generated.hookScore);
 
       return {
-        content: generated.content,
+        content: stripMarkdown(generated.content),
         hookScore: generated.hookScore,
         suggestions: generated.suggestions,
       };
@@ -653,7 +665,7 @@ Now generate the LinkedIn post following all requirements above.`;
       });
 
       return {
-        content: generated.content,
+        content: stripMarkdown(generated.content),
         hookScore: generated.hookScore,
         calibratedHookScore,
         suggestions: generated.suggestions,
@@ -1053,7 +1065,7 @@ Respond with ONLY valid JSON:
       const improved = JSON.parse(cleanedResponse);
 
       return {
-        content: improved.content,
+        content: stripMarkdown(improved.content),
         hookScore: improved.hookScore || 0,
         suggestions: improved.suggestions || [],
       };

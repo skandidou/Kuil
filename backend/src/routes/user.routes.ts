@@ -133,46 +133,69 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
 
     // If LinkedIn Analytics is connected, use real data
     if (analyticsToken && (!analyticsTokenExpiry || new Date(analyticsTokenExpiry) > new Date())) {
-      console.log(`📊 [user/stats] Fetching real LinkedIn data for home screen...`);
+      console.log(`📊 [user/stats] Checking cached snapshot before LinkedIn API...`);
 
+      // STEP 1: Check for fresh cached snapshot (< 1 hour) — avoids unnecessary API calls + rate limits
       try {
-        const [followers, impressions, reactions, comments, reshares] = await Promise.all([
-          LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch(() => 0),
-          LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
-        ]);
+        const isFresh = await LinkedInAnalyticsService.isSnapshotFresh(req.userId!, 60);
+        if (isFresh) {
+          const cachedSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+          if (cachedSnapshot && cachedSnapshot.visibilityScore > 0) {
+            console.log(`✅ [user/stats] Using cached snapshot, visibility=${cachedSnapshot.visibilityScore}`);
+            visibilityScore = cachedSnapshot.visibilityScore;
+          }
+        }
+      } catch (cacheErr: any) {
+        console.error('⚠️ [user/stats] Cache check failed:', cacheErr.message);
+      }
 
-        // Calculate visibility score based on project specification:
-        // Velocity (40%): Engagement rate (likes + comments*2) / impressions
-        // Network Reach (30%): Viral coefficient (impressions / followers)
-        // Consistency (30%): Posting frequency bonus
+      // STEP 2: Only call LinkedIn API if no cached score
+      if (visibilityScore === 0) {
+        console.log(`📊 [user/stats] No cached score, fetching from LinkedIn API...`);
+        try {
+          const [followers, impressions, reactions, comments, reshares] = await Promise.all([
+            LinkedInAnalyticsService.getFollowerCount(analyticsToken).catch(() => 0),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'IMPRESSION').catch(() => 0),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'REACTION').catch(() => 0),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'COMMENT').catch(() => 0),
+            LinkedInAnalyticsService.getAggregatedPostAnalytics(analyticsToken, 'RESHARE').catch(() => 0),
+          ]);
 
-        // Velocity Score (40 points max)
-        const engagementRate = impressions > 0
-          ? ((reactions + comments * 2) / impressions) * 100
-          : 0;
-        const velocityScore = Math.min(40, engagementRate * 8);
+          // Velocity Score (40 points max)
+          const engagementRate = impressions > 0
+            ? ((reactions + comments * 2) / impressions) * 100
+            : 0;
+          const velocityScore = Math.min(40, engagementRate * 8);
 
-        // Network Reach Score (30 points max)
-        const viralCoefficient = followers > 0
-          ? impressions / followers
-          : (impressions > 0 ? 10 : 0);
-        const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
+          // Network Reach Score (30 points max)
+          const viralCoefficient = followers > 0
+            ? impressions / followers
+            : (impressions > 0 ? 10 : 0);
+          const networkReachScore = Math.min(30, Math.log10(Math.max(viralCoefficient, 1) + 1) * 15);
 
-        // Consistency Score (30 points max) - base score for having activity
-        const hasActivity = impressions > 0 || reactions > 0;
-        const consistencyScore = hasActivity ? 15 : 0;
+          // Consistency Score (30 points max)
+          const hasActivity = impressions > 0 || reactions > 0;
+          const consistencyScore = hasActivity ? 15 : 0;
 
-        visibilityScore = Math.min(100,
-          Math.round(velocityScore + networkReachScore + consistencyScore)
-        );
+          visibilityScore = Math.min(100,
+            Math.round(velocityScore + networkReachScore + consistencyScore)
+          );
 
-        console.log(`✅ [user/stats] Visibility: velocity=${velocityScore.toFixed(1)}/40, reach=${networkReachScore.toFixed(1)}/30, consistency=${consistencyScore}/30 = ${visibilityScore}`);
-      } catch (error: any) {
-        console.error('❌ [user/stats] LinkedIn API error:', error.message);
-        // Fallback to local data calculation
+          console.log(`✅ [user/stats] Visibility: velocity=${velocityScore.toFixed(1)}/40, reach=${networkReachScore.toFixed(1)}/30, consistency=${consistencyScore}/30 = ${visibilityScore}`);
+        } catch (error: any) {
+          console.error('❌ [user/stats] LinkedIn API error:', error.message);
+
+          // STEP 3: API failed — try any cached snapshot as fallback (even if old)
+          try {
+            const fallbackSnapshot = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+            if (fallbackSnapshot && fallbackSnapshot.visibilityScore > 0) {
+              console.log(`⚠️ [user/stats] API failed, using stale snapshot, visibility=${fallbackSnapshot.visibilityScore}`);
+              visibilityScore = fallbackSnapshot.visibilityScore;
+            }
+          } catch {
+            // Silently fall through to local data fallback
+          }
+        }
       }
     }
 

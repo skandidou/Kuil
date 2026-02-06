@@ -6,6 +6,19 @@ import { LinkedInAnalyticsService } from '../services/LinkedInAnalyticsService';
 const router = Router();
 
 /**
+ * Strip markdown formatting from AI-generated text.
+ * Removes **bold**, *italic*, and other markdown syntax
+ * that iOS Text() cannot render.
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')  // **bold** and *italic*
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')      // __bold__ and _italic_
+    .replace(/#{1,6}\s/g, '')                     // # headings
+    .trim();
+}
+
+/**
  * Update linkedin_posts with real per-post analytics from Community Management API
  * This enriches the basic post data with real impressions, reactions, etc.
  */
@@ -796,13 +809,13 @@ RULES:
 3. Be direct and actionable - tell them exactly what to do next
 4. If they have impressions data, analyze their reach and engagement rate
 5. Keep each insight to 1-2 sentences max
-6. Use **bold** for key metrics and actions
+6. Do NOT use any markdown formatting (no *, no **, no #, no _). Write naturally as plain text without any formatting symbols.
 7. Write in French
 
 EXAMPLES OF GOOD INSIGHTS:
-- "Avec **1300+ impressions** sur vos posts, votre contenu touche une audience solide. Publiez **2-3 fois par semaine** pour maximiser cette portée."
-- "Votre taux d'engagement de **X%** est au-dessus de la moyenne LinkedIn. Continuez à créer du contenu qui génère des **commentaires**."
-- "Vous avez **5 posts publiés** - les créateurs LinkedIn qui publient régulièrement voient 3x plus de visibilité."
+- "Avec 1300+ impressions sur vos posts, votre contenu touche une audience solide. Publiez 2-3 fois par semaine pour maximiser cette portee."
+- "Votre taux d'engagement de X% est au-dessus de la moyenne LinkedIn. Continuez a creer du contenu qui genere des commentaires."
+- "Vous avez 5 posts publies - les createurs LinkedIn qui publient regulierement voient 3x plus de visibilite."
 
 Return ONLY a valid JSON array:
 [
@@ -825,13 +838,19 @@ ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, 
       throw new Error('No valid JSON in AI response');
     }
 
-    const insights = JSON.parse(jsonMatch[0]);
+    const rawInsights = JSON.parse(jsonMatch[0]);
 
     // Validate insights structure
-    if (!Array.isArray(insights) || insights.length === 0) {
-      console.error('❌ Invalid insights format:', insights);
+    if (!Array.isArray(rawInsights) || rawInsights.length === 0) {
+      console.error('❌ Invalid insights format:', rawInsights);
       throw new Error('Invalid insights format');
     }
+
+    // Sanitize: strip any remaining markdown from AI text (safety net)
+    const insights = rawInsights.map((insight: any) => ({
+      ...insight,
+      text: typeof insight.text === 'string' ? stripMarkdown(insight.text) : insight.text,
+    }));
 
     console.log(`✅ Generated ${insights.length} personalized AI insights`);
 
