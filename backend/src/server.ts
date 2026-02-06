@@ -368,7 +368,12 @@ async function startServer(): Promise<void> {
   try {
     Logger.info('SERVER', 'Starting Kuil Backend...');
 
-    // 0. Run database migrations
+    // 0. Warm up the database connection pool (prevents 500 errors on first request)
+    Logger.info('SERVER', 'Warming up database connection pool...');
+    await pool.query('SELECT 1');
+    Logger.info('SERVER', 'Database pool ready');
+
+    // 0b. Run database migrations
     Logger.info('SERVER', 'Running database migrations...');
     await runMigrations();
 

@@ -691,8 +691,8 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
   try {
     console.log(`💡 Generating AI insights for user ${req.userId}...`);
 
-    // Gather ALL user data for analysis
-    const [postsResult, linkedinPostsResult, linkedinStatsResult, voiceResult, userResult] = await Promise.all([
+    // Gather ALL user data for analysis (including cached analytics snapshot)
+    const [postsResult, linkedinPostsResult, linkedinStatsResult, voiceResult, userResult, snapshotResult] = await Promise.all([
       query(
         `SELECT content, hook_score, status, scheduled_at, published_at, created_at
          FROM generated_posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
@@ -703,7 +703,7 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
          FROM linkedin_posts WHERE user_id = $1 ORDER BY posted_at DESC LIMIT 20`,
         [req.userId]
       ),
-      // Get aggregated LinkedIn stats
+      // Get aggregated LinkedIn stats from linkedin_posts
       query(
         `SELECT
           COUNT(*) as total_posts,
@@ -723,6 +723,15 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
         `SELECT name, role, headline, created_at FROM users WHERE id = $1`,
         [req.userId]
       ),
+      // Get latest analytics snapshot (from LinkedIn Community Management API cache)
+      query(
+        `SELECT follower_count, connection_count, total_impressions, total_members_reached,
+                total_reactions, total_comments, total_reshares, visibility_score, engagement_rate,
+                snapshot_date
+         FROM analytics_snapshots WHERE user_id = $1
+         ORDER BY snapshot_date DESC LIMIT 1`,
+        [req.userId]
+      ),
     ]);
 
     const posts = postsResult.rows;
@@ -730,8 +739,17 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
     const linkedinStats = linkedinStatsResult.rows[0];
     const voiceSignature = voiceResult.rows[0];
     const user = userResult.rows[0];
+    const snapshot = snapshotResult.rows[0];
 
-    console.log(`📊 Insights data: ${posts.length} generated posts, ${linkedinPosts.length} LinkedIn posts, ${linkedinStats?.total_impressions || 0} impressions`);
+    // Use snapshot data as primary source (more reliable than linkedin_posts table which may be empty)
+    const totalImpressions = snapshot?.total_impressions || parseInt(linkedinStats?.total_impressions || '0', 10);
+    const totalReactionsForInsights = snapshot?.total_reactions || parseInt(linkedinStats?.total_likes || '0', 10);
+    const totalCommentsForInsights = snapshot?.total_comments || parseInt(linkedinStats?.total_comments || '0', 10);
+    const followerCount = snapshot?.follower_count || 0;
+    const visibilityScore = snapshot?.visibility_score || 0;
+    const engagementRate = snapshot?.engagement_rate || 0;
+
+    console.log(`📊 Insights data: ${posts.length} generated posts, ${linkedinPosts.length} LinkedIn posts, snapshot impressions=${totalImpressions}, followers=${followerCount}, visibility=${visibilityScore}`);
 
     // Build comprehensive context for AI
     const context: any = {
@@ -767,21 +785,24 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
           status: p.status,
         })),
       },
+      // LinkedIn analytics from Community Management API snapshot (primary source)
+      linkedinAnalytics: {
+        followerCount,
+        visibilityScore,
+        totalImpressions,
+        totalReactions: totalReactionsForInsights,
+        totalComments: totalCommentsForInsights,
+        totalReshares: snapshot?.total_reshares || 0,
+        engagementRate: parseFloat(String(engagementRate)) || 0,
+        snapshotDate: snapshot?.snapshot_date || null,
+      },
+      // LinkedIn posts from local cache (may be empty if posts haven't been synced)
       linkedinPosts: {
         total: parseInt(linkedinStats?.total_posts || '0', 10),
         totalLikes: parseInt(linkedinStats?.total_likes || '0', 10),
         totalComments: parseInt(linkedinStats?.total_comments || '0', 10),
         totalShares: parseInt(linkedinStats?.total_shares || '0', 10),
         totalImpressions: parseInt(linkedinStats?.total_impressions || '0', 10),
-        avgEngagement: linkedinPosts.length > 0
-          ? Math.round(linkedinPosts.reduce((sum, p) => sum + (p.likes || 0) + (p.comments || 0), 0) / linkedinPosts.length)
-          : null,
-        avgImpressionsPerPost: linkedinPosts.length > 0
-          ? Math.round(parseInt(linkedinStats?.total_impressions || '0', 10) / linkedinPosts.length)
-          : null,
-        topPost: linkedinPosts.length > 0
-          ? linkedinPosts.sort((a, b) => ((b.likes || 0) + (b.comments || 0)) - ((a.likes || 0) + (a.comments || 0)))[0]
-          : null,
         recentPosts: linkedinPosts.slice(0, 5).map(p => ({
           content: p.content?.substring(0, 100),
           likes: p.likes || 0,
@@ -803,24 +824,26 @@ router.get('/insights', authenticate, async (req: AuthRequest, res: Response) =>
 USER DATA:
 ${JSON.stringify(context, null, 2)}
 
+IMPORTANT CONTEXT:
+- linkedinAnalytics contains REAL data from LinkedIn API (followerCount, totalImpressions, totalReactions, engagementRate, visibilityScore)
+- generatedPosts contains posts created in the app (published, scheduled, drafts, failed)
+- The user's role is "${user?.role || 'Professional'}" - adapt your advice to their role
+- The user has been on the platform for ${context.user.daysSinceJoined} days
+
 RULES:
 1. ONLY use data provided above - NEVER invent or make up statistics
-2. Reference SPECIFIC numbers from their data (impressions, likes, posts count, etc.)
+2. Reference SPECIFIC numbers from their linkedinAnalytics data (${totalImpressions} impressions, ${totalReactionsForInsights} reactions, ${followerCount} followers, ${engagementRate}% engagement rate, visibility score ${visibilityScore}/100)
 3. Be direct and actionable - tell them exactly what to do next
-4. If they have impressions data, analyze their reach and engagement rate
+4. Analyze their engagement rate vs LinkedIn average (2-5% is good, above 5% is excellent)
 5. Keep each insight to 1-2 sentences max
 6. Do NOT use any markdown formatting (no *, no **, no #, no _). Write naturally as plain text without any formatting symbols.
 7. Write in French
-
-EXAMPLES OF GOOD INSIGHTS:
-- "Avec 1300+ impressions sur vos posts, votre contenu touche une audience solide. Publiez 2-3 fois par semaine pour maximiser cette portee."
-- "Votre taux d'engagement de X% est au-dessus de la moyenne LinkedIn. Continuez a creer du contenu qui genere des commentaires."
-- "Vous avez 5 posts publies - les createurs LinkedIn qui publient regulierement voient 3x plus de visibilite."
+8. Be honest about what needs improvement, dont just give generic praise
 
 Return ONLY a valid JSON array:
 [
-  {"icon": "bolt.fill", "text": "Your insight in French referencing their actual data"},
-  {"icon": "chart.line.uptrend.xyaxis", "text": "Another data-driven insight in French"},
+  {"icon": "bolt.fill", "text": "First insight in French with specific numbers"},
+  {"icon": "chart.line.uptrend.xyaxis", "text": "Second insight in French with specific numbers"},
   {"icon": "lightbulb.fill", "text": "Third actionable recommendation in French"}
 ]
 
@@ -863,14 +886,42 @@ ICON OPTIONS: bolt.fill, chart.line.uptrend.xyaxis, lightbulb.fill, flame.fill, 
       stack: error.stack?.substring(0, 300),
     });
 
-    // Return a simple fallback insight when AI fails
-    // We can't access context here as it may not be defined if error occurred early
-    const fallbackInsights = [
-      {
-        icon: 'lightbulb.fill',
-        text: 'Continuez à publier régulièrement pour débloquer des insights personnalisés basés sur vos performances LinkedIn.',
-      },
-    ];
+    // Generate data-driven fallback insights when Gemini fails
+    // Try to use snapshot data if available for personalized fallback
+    let fallbackInsights;
+    try {
+      const snapshotFallback = await LinkedInAnalyticsService.getLatestSnapshot(req.userId!);
+      if (snapshotFallback && snapshotFallback.visibilityScore > 0) {
+        fallbackInsights = [
+          {
+            icon: 'chart.line.uptrend.xyaxis',
+            text: `Votre score de visibilite est de ${snapshotFallback.visibilityScore}/100 avec ${snapshotFallback.totalImpressions} impressions. Publiez regulierement pour ameliorer ce score.`,
+          },
+          {
+            icon: 'person.fill',
+            text: `Vous avez ${snapshotFallback.followerCount} abonnes et ${snapshotFallback.totalReactions} reactions sur vos publications. Engagez avec votre audience pour accelerer votre croissance.`,
+          },
+          {
+            icon: 'lightbulb.fill',
+            text: `Votre taux d'engagement est de ${snapshotFallback.engagementRate}%. Publiez du contenu qui invite aux commentaires pour augmenter ce chiffre.`,
+          },
+        ];
+      } else {
+        fallbackInsights = [
+          {
+            icon: 'lightbulb.fill',
+            text: 'Commencez par publier votre premier post pour debloquer des insights personnalises bases sur vos performances LinkedIn.',
+          },
+        ];
+      }
+    } catch {
+      fallbackInsights = [
+        {
+          icon: 'lightbulb.fill',
+          text: 'Publiez regulierement pour debloquer des insights personnalises bases sur vos performances LinkedIn.',
+        },
+      ];
+    }
 
     console.log(`⚠️ Using fallback insight due to Gemini error`);
     res.json({ insights: fallbackInsights });
