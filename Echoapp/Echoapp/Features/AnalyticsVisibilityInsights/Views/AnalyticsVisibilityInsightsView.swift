@@ -263,24 +263,8 @@ struct AnalyticsVisibilityInsightsView: View {
                         }
                     }
                     
-                    // Top Performing Posts
-                    VStack(alignment: .leading, spacing: Spacing.md) {
-                        Text("Top Performing Posts")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-                            .padding(.horizontal, Spacing.md)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: Spacing.md) {
-                                ForEach(viewModel.topPosts, id: \.id) { post in
-                                    TopPostCard(post: post)
-                                }
-                            }
-                            .padding(.horizontal, Spacing.md)
-                        }
-                    }
-                    .padding(.bottom, Spacing.xl)
+                    Spacer()
+                        .frame(height: Spacing.xl)
                 }
             }
         }

@@ -221,7 +221,9 @@ class MainDashboardViewModel: ObservableObject {
     func loadScoreChange() async {
         do {
             struct AnalyticsResponse: Codable {
+                let visibilityScore: Int?
                 let scoreChange: Double?
+                let analyticsConnected: Bool?
             }
 
             let response: AnalyticsResponse = try await APIClient.shared.get(
@@ -229,8 +231,12 @@ class MainDashboardViewModel: ObservableObject {
                 requiresAuth: true
             )
 
-            if let change = response.scoreChange {
-                await MainActor.run {
+            await MainActor.run {
+                // Use analytics visibility score as primary source (more accurate than /api/user/stats)
+                if let analyticsScore = response.visibilityScore, analyticsScore > 0 {
+                    self.visibilityScore = analyticsScore
+                }
+                if let change = response.scoreChange {
                     self.scoreChange = change
                 }
             }
