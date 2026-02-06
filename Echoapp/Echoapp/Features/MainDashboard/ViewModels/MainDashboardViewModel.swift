@@ -113,7 +113,7 @@ class MainDashboardViewModel: ObservableObject {
                         )
                     }
                 } catch {
-                    print("Failed to load stats: \(error)")
+                    debugLog("Failed to load stats: \(error)")
                 }
             }
         } else if let stats = AppState.shared.userStats {
@@ -171,7 +171,7 @@ class MainDashboardViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("Failed to load success patterns: \(error)")
+            debugLog("Failed to load success patterns: \(error)")
         }
     }
 
@@ -201,7 +201,7 @@ class MainDashboardViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("Failed to load best time: \(error)")
+            debugLog("Failed to load best time: \(error)")
         }
     }
 
@@ -228,14 +228,14 @@ class MainDashboardViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("Failed to load score change: \(error)")
+            debugLog("Failed to load score change: \(error)")
         }
     }
 
     /// Load next scheduled post from backend
     func loadNextScheduledPost() async {
         do {
-            print("📅 Loading next scheduled post...")
+            debugLog("📅 Loading next scheduled post...")
 
             struct ScheduledPostsResponse: Codable {
                 let posts: [ScheduledPostItem]
@@ -264,15 +264,15 @@ class MainDashboardViewModel: ObservableObject {
                         title: truncatedTitle,
                         schedule: formatScheduleDate(nextPost.scheduledAt!)
                     )
-                    print("✅ Next scheduled post loaded: \(truncatedTitle)")
+                    debugLog("✅ Next scheduled post loaded: \(truncatedTitle)")
                 } else {
                     // No scheduled posts - set to nil (UI should handle this)
                     self.nextScheduledItem = nil
-                    print("ℹ️ No scheduled posts found")
+                    debugLog("ℹ️ No scheduled posts found")
                 }
             }
         } catch {
-            print("❌ Failed to load next scheduled post: \(error)")
+            debugLog("❌ Failed to load next scheduled post: \(error)")
             await MainActor.run {
                 self.nextScheduledItem = nil
             }
@@ -310,7 +310,7 @@ class MainDashboardViewModel: ObservableObject {
 
     func loadDailyInspirations() async {
         do {
-            print("💡 Loading daily inspirations...")
+            debugLog("💡 Loading daily inspirations...")
 
             struct DailyInspirationsResponse: Codable {
                 let inspirations: [InspirationData]
@@ -341,9 +341,9 @@ class MainDashboardViewModel: ObservableObject {
                 }
             }
 
-            print("✅ Loaded \(response.inspirations.count) daily inspirations")
+            debugLog("✅ Loaded \(response.inspirations.count) daily inspirations")
         } catch {
-            print("❌ Failed to load inspirations: \(error)")
+            debugLog("❌ Failed to load inspirations: \(error)")
             // Fallback to default inspirations
             let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
             inspirationCards = [
@@ -353,7 +353,7 @@ class MainDashboardViewModel: ObservableObject {
                     title: "What top founders are saying about 2026",
                     subtitle: "Based on recent CEO interviews",
                     imageIcon: "chart.line.uptrend.xyaxis",
-                    imageUrl: "https://source.unsplash.com/560x280/?startup,founder&sig=\(dayOfYear)"
+                    imageUrl: nil
                 )
             ]
         }

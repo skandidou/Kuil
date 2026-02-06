@@ -126,7 +126,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
 
     func fetchScheduledPosts() async {
         do {
-            print("📅 Fetching scheduled posts...")
+            debugLog("📅 Fetching scheduled posts...")
 
             // Call backend to get scheduled posts
             let response: ScheduledPostsResponse = try await APIClient.shared.get(
@@ -166,7 +166,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                     )
                 }
 
-                print("✅ Loaded \(response.posts.count) total posts, \(filteredPosts.count) match selected day (\(selectedDate))")
+                debugLog("✅ Loaded \(response.posts.count) total posts, \(filteredPosts.count) match selected day (\(selectedDate))")
 
                 // If no posts for this day, show proper empty state (no fake data)
                 if self.timelineItems.isEmpty {
@@ -186,7 +186,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("❌ Failed to load scheduled posts: \(error)")
+            debugLog("❌ Failed to load scheduled posts: \(error)")
             // Show proper empty state on error (no fake data)
             await MainActor.run {
                 self.timelineItems = [
@@ -275,7 +275,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
 
     func updatePost() async {
         do {
-            print("✏️ Updating post \(editingPostId)...")
+            debugLog("✏️ Updating post \(editingPostId)...")
 
             struct UpdateResponse: Codable {
                 let success: Bool
@@ -292,14 +292,14 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 ]
             )
 
-            print("✅ Post updated successfully")
+            debugLog("✅ Post updated successfully")
 
             await MainActor.run {
                 self.showEditSheet = false
                 self.loadTimeline()
             }
         } catch {
-            print("❌ Failed to update post: \(error)")
+            debugLog("❌ Failed to update post: \(error)")
         }
     }
 
@@ -318,7 +318,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
 
     func performDeletePost() async {
         do {
-            print("🗑️ Deleting post \(deletingPostId)...")
+            debugLog("🗑️ Deleting post \(deletingPostId)...")
 
             struct DeleteResponse: Codable {
                 let success: Bool
@@ -328,7 +328,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 endpoint: "/api/posts/\(deletingPostId)"
             )
 
-            print("✅ Post deleted successfully")
+            debugLog("✅ Post deleted successfully")
 
             await MainActor.run {
                 self.showDeleteConfirmation = false
@@ -337,7 +337,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 NotificationCenter.default.post(name: .postsDeleted, object: nil)
             }
         } catch {
-            print("❌ Failed to delete post: \(error)")
+            debugLog("❌ Failed to delete post: \(error)")
         }
     }
 
@@ -375,7 +375,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
     func executeBulkDelete() async {
         do {
             let postIds = Array(selectedPostIds)
-            print("🗑️ Bulk deleting \(postIds.count) posts...")
+            debugLog("🗑️ Bulk deleting \(postIds.count) posts...")
 
             struct BulkDeleteResponse: Codable {
                 let success: Bool
@@ -387,7 +387,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 body: ["postIds": postIds]
             )
 
-            print("✅ Bulk delete successful: \(response.deletedCount) posts deleted")
+            debugLog("✅ Bulk delete successful: \(response.deletedCount) posts deleted")
 
             await MainActor.run {
                 self.showBulkDeleteConfirmation = false
@@ -397,7 +397,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 NotificationCenter.default.post(name: .postsDeleted, object: nil)
             }
         } catch {
-            print("❌ Failed to bulk delete posts: \(error)")
+            debugLog("❌ Failed to bulk delete posts: \(error)")
             await MainActor.run {
                 self.showBulkDeleteConfirmation = false
             }
@@ -427,7 +427,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
         }
 
         do {
-            print("🤖 Fetching optimal posting time...")
+            debugLog("🤖 Fetching optimal posting time...")
 
             struct OptimalTimeResponse: Codable {
                 let suggestedTime: String
@@ -439,7 +439,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 requiresAuth: true
             )
 
-            print("✅ Optimal time: \(response.suggestedTime) - \(response.reason)")
+            debugLog("✅ Optimal time: \(response.suggestedTime) - \(response.reason)")
 
             await MainActor.run {
                 self.optimalTimeSuggestion = response.suggestedTime
@@ -448,7 +448,7 @@ class ContentCalendarSchedulingViewModel: ObservableObject {
                 self.isLoadingOptimalTime = false
             }
         } catch {
-            print("❌ Failed to fetch optimal time: \(error)")
+            debugLog("❌ Failed to fetch optimal time: \(error)")
             await MainActor.run {
                 self.optimalTimeSuggestion = "12:00 PM"
                 self.optimalTimeReason = "Based on general LinkedIn engagement patterns"

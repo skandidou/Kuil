@@ -70,7 +70,7 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
         // isLoading and currentQuote already set by startIfNeeded()
 
         do {
-            print("🤖 Generating \(totalSteps) AI posts for tone calibration...")
+            debugLog("🤖 Generating \(totalSteps) AI posts for tone calibration...")
 
             // Call backend with extended timeout (90 seconds for Claude Opus)
             let response: ToneCalibrationPostsResponse = try await APIClient.shared.postLongRunning(
@@ -79,21 +79,21 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
                 timeoutSeconds: 90
             )
 
-            print("📦 Received \(response.posts.count) posts from API")
+            debugLog("📦 Received \(response.posts.count) posts from API")
 
             if response.posts.isEmpty {
-                print("⚠️ API returned empty posts array, using fallback")
+                debugLog("⚠️ API returned empty posts array, using fallback")
                 useFallbackPosts()
             } else {
                 calibrationPosts = response.posts
                 aiGeneratedPosts = response.posts.map { $0.content }
-                print("✅ Generated \(calibrationPosts.count) AI posts for calibration")
+                debugLog("✅ Generated \(calibrationPosts.count) AI posts for calibration")
                 loadCurrentQuote()
             }
 
         } catch {
-            print("❌ Error generating AI posts: \(error.localizedDescription)")
-            print("🔄 Using fallback posts instead...")
+            debugLog("❌ Error generating AI posts: \(error.localizedDescription)")
+            debugLog("🔄 Using fallback posts instead...")
             useFallbackPosts()
         }
 
@@ -115,7 +115,7 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
             CalibrationPost(tone: tones[index % tones.count], content: content)
         }
 
-        print("📝 Loaded \(calibrationPosts.count) fallback posts")
+        debugLog("📝 Loaded \(calibrationPosts.count) fallback posts")
         loadCurrentQuote()
     }
 
@@ -123,26 +123,26 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
         // Load AI-generated post for current step
         let index = currentStep - 1
 
-        print("📖 Loading quote for step \(currentStep), index \(index), calibrationPosts: \(calibrationPosts.count), aiGeneratedPosts: \(aiGeneratedPosts.count)")
+        debugLog("📖 Loading quote for step \(currentStep), index \(index), calibrationPosts: \(calibrationPosts.count), aiGeneratedPosts: \(aiGeneratedPosts.count)")
 
         if index < calibrationPosts.count && !calibrationPosts[index].content.isEmpty {
             // Use calibration posts with tone info from API
             currentQuote = calibrationPosts[index].content
             toneBadge = formatToneBadge(calibrationPosts[index].tone)
-            print("✅ Loaded calibration post: \(calibrationPosts[index].tone)")
+            debugLog("✅ Loaded calibration post: \(calibrationPosts[index].tone)")
         } else if index < aiGeneratedPosts.count && !aiGeneratedPosts[index].isEmpty {
             // Fallback to content-only posts
             currentQuote = aiGeneratedPosts[index]
             updateToneBadge(for: currentStep)
-            print("✅ Loaded fallback post at index \(index)")
+            debugLog("✅ Loaded fallback post at index \(index)")
         } else {
             // Only show "completed" if we've actually gone through all steps
             if currentStep > totalSteps {
                 currentQuote = "Calibration completed!"
-                print("🎉 Calibration completed!")
+                debugLog("🎉 Calibration completed!")
             } else {
                 // This shouldn't happen - use emergency fallback
-                print("⚠️ No post available for index \(index), using emergency fallback")
+                debugLog("⚠️ No post available for index \(index), using emergency fallback")
                 currentQuote = generateFallbackPosts()[index % 12]
                 updateToneBadge(for: currentStep)
             }
@@ -240,7 +240,7 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
 
     func saveUserPreferences() async {
         do {
-            print("💾 Saving tone calibration preferences...")
+            debugLog("💾 Saving tone calibration preferences...")
 
             // Send user preferences to backend to refine voice profile
             let _: VoiceCalibrationResponse = try await APIClient.shared.post(
@@ -252,9 +252,9 @@ class ToneCalibrationSwipeFlowViewModel: ObservableObject {
                 requiresAuth: true
             )
 
-            print("✅ Tone preferences saved successfully")
+            debugLog("✅ Tone preferences saved successfully")
         } catch {
-            print("❌ Failed to save preferences: \(error)")
+            debugLog("❌ Failed to save preferences: \(error)")
         }
     }
 

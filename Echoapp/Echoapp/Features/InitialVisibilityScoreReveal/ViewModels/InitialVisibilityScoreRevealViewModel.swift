@@ -37,7 +37,7 @@ class InitialVisibilityScoreRevealViewModel: ObservableObject {
                 AppState.shared.userStats = stats
                 applyScore(stats.visibilityScore)
             } catch {
-                print("Failed to load visibility score: \(error)")
+                debugLog("Failed to load visibility score: \(error)")
                 // Fallback: still show something reasonable
                 applyScore(35)
             }

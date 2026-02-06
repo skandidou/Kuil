@@ -38,7 +38,7 @@ class AIPostGenerationVariantsViewModel: ObservableObject {
                 convertToUIVariant(variant, style: getStyleForIndex(index))
             }
         } catch {
-            print("❌ Error generating post variants: \(error)")
+            debugLog("❌ Error generating post variants: \(error)")
             errorMessage = "Failed to generate posts. Please try again."
 
             // Fallback to sample variants if API fails

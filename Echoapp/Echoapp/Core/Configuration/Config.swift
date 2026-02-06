@@ -9,12 +9,7 @@ import Foundation
 
 struct Config {
     // MARK: - Backend Configuration
-    // TODO: Change to https://api.kuil.ai once DNS is configured on Railway
-    #if DEBUG
-    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Development (Railway)
-    #else
-    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app" // Production (Railway)
-    #endif
+    static let backendURL = "https://echoapp-backend-production-699c.up.railway.app"
 
     // MARK: - Website
     static let websiteURL = "https://kuil.ai"
@@ -36,7 +31,7 @@ struct Config {
         static let linkedInPosts = "/api/linkedin/posts"
         static let linkedInPublish = "/api/linkedin/publish"
 
-        // Voice (Gemini)
+        // Voice (AI)
         static let voiceAnalyze = "/api/voice/analyze"
         static let voiceSignature = "/api/voice/signature"
         static let voiceGenerate = "/api/voice/generate"

@@ -261,7 +261,7 @@ struct TopicInterestsSelectionView: View {
                     body: ["topics": Array(selectedTopics)]
                 )
             } catch {
-                print("Failed to save topics: \(error)")
+                debugLog("Failed to save topics: \(error)")
             }
 
             await MainActor.run {
@@ -328,6 +328,6 @@ struct FlowLayout: Layout {
 
 #Preview {
     TopicInterestsSelectionView { topics in
-        print("Selected: \(topics)")
+        debugLog("Selected: \(topics)")
     }
 }

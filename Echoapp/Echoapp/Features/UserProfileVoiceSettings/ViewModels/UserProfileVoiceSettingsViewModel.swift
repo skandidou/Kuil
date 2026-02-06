@@ -103,7 +103,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                         AppState.shared.userProfile = profile
                     }
                 } catch {
-                    print("Failed to load profile: \(error)")
+                    debugLog("Failed to load profile: \(error)")
                 }
             }
         } else {
@@ -137,7 +137,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                 self.evolutionHistory = Array(response.history.prefix(5))
             }
         } catch {
-            print("Failed to load evolution history: \(error)")
+            debugLog("Failed to load evolution history: \(error)")
         }
     }
 
@@ -169,7 +169,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("Failed to load success patterns: \(error)")
+            debugLog("Failed to load success patterns: \(error)")
         }
     }
 
@@ -179,7 +179,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
 
         Task {
             do {
-                print("🎤 Loading voice signature from backend...")
+                debugLog("🎤 Loading voice signature from backend...")
 
                 if let signature = try await ClaudeService.shared.fetchVoiceSignature() {
                     await MainActor.run {
@@ -187,20 +187,20 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                         self.primaryTone = signature.primaryTone
                         self.isLoadingSignature = false
                     }
-                    print("✅ Voice signature loaded: \(signature.primaryTone)")
+                    debugLog("✅ Voice signature loaded: \(signature.primaryTone)")
                 } else {
                     // No existing signature - analyze now
-                    print("📊 No voice signature found, analyzing...")
+                    debugLog("📊 No voice signature found, analyzing...")
                     let newSignature = try await ClaudeService.shared.analyzeVoiceSignature()
                     await MainActor.run {
                         self.voiceSignature = newSignature.radarValues
                         self.primaryTone = newSignature.primaryTone
                         self.isLoadingSignature = false
                     }
-                    print("✅ Voice signature analyzed: \(newSignature.primaryTone)")
+                    debugLog("✅ Voice signature analyzed: \(newSignature.primaryTone)")
                 }
             } catch {
-                print("❌ Failed to load voice signature: \(error)")
+                debugLog("❌ Failed to load voice signature: \(error)")
                 await MainActor.run {
                     self.isLoadingSignature = false
                     // Set default "unknown" state
@@ -225,7 +225,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     func togglePushNotifications() {
         pushNotificationsEnabled.toggle()
         // In production, this would save to UserDefaults and update backend
-        print("📱 Push notifications: \(pushNotificationsEnabled ? "enabled" : "disabled")")
+        debugLog("📱 Push notifications: \(pushNotificationsEnabled ? "enabled" : "disabled")")
     }
 
     func showAccountStatus() {
@@ -243,7 +243,7 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
     func reanalyzeProfile() {
         Task {
             do {
-                print("🤖 Starting voice re-analysis with Claude...")
+                debugLog("🤖 Starting voice re-analysis with Claude...")
 
                 // Call backend API to analyze voice with Gemini
                 let response: VoiceSignatureData = try await APIClient.shared.post(
@@ -268,9 +268,9 @@ class UserProfileVoiceSettingsViewModel: ObservableObject {
                     }
                 }
 
-                print("✅ Voice signature updated")
+                debugLog("✅ Voice signature updated")
             } catch {
-                print("❌ Error reanalyzing profile: \(error)")
+                debugLog("❌ Error reanalyzing profile: \(error)")
             }
         }
     }

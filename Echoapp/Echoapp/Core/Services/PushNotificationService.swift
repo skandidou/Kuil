@@ -39,14 +39,14 @@ class PushNotificationService: NSObject, ObservableObject {
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
-                print("[Push] Notification permission granted")
+                debugLog("[Push] Notification permission granted")
             } else {
-                print("[Push] Notification permission denied")
+                debugLog("[Push] Notification permission denied")
             }
 
             return granted
         } catch {
-            print("[Push] Error requesting authorization: \(error)")
+            debugLog("[Push] Error requesting authorization: \(error)")
             return false
         }
     }
@@ -66,7 +66,7 @@ class PushNotificationService: NSObject, ObservableObject {
     func didRegisterForRemoteNotifications(deviceToken: Data) {
         // Convert token to string for FCM (if not using Firebase SDK directly)
         let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
-        print("[Push] APNs device token: \(tokenString.prefix(20))...")
+        debugLog("[Push] APNs device token: \(tokenString.prefix(20))...")
 
         // If using Firebase SDK, Firebase will handle this automatically
         // Otherwise, send to your server for FCM registration
@@ -75,7 +75,7 @@ class PushNotificationService: NSObject, ObservableObject {
     /// Update FCM token (called by Firebase SDK or manually)
     func updateFCMToken(_ token: String) {
         self.fcmToken = token
-        print("[Push] FCM token updated: \(token.prefix(20))...")
+        debugLog("[Push] FCM token updated: \(token.prefix(20))...")
 
         // Register with backend
         Task {
@@ -99,9 +99,9 @@ class PushNotificationService: NSObject, ObservableObject {
                 body: deviceInfo
             )
 
-            print("[Push] Device registered with backend")
+            debugLog("[Push] Device registered with backend")
         } catch {
-            print("[Push] Failed to register device: \(error)")
+            debugLog("[Push] Failed to register device: \(error)")
         }
     }
 
@@ -120,9 +120,9 @@ class PushNotificationService: NSObject, ObservableObject {
                 self.fcmToken = nil
             }
 
-            print("[Push] Device unregistered")
+            debugLog("[Push] Device unregistered")
         } catch {
-            print("[Push] Failed to unregister device: \(error)")
+            debugLog("[Push] Failed to unregister device: \(error)")
         }
     }
 
@@ -130,7 +130,7 @@ class PushNotificationService: NSObject, ObservableObject {
 
     /// Handle received notification (foreground)
     func handleNotification(userInfo: [AnyHashable: Any]) {
-        print("[Push] Received notification: \(userInfo)")
+        debugLog("[Push] Received notification: \(userInfo)")
 
         guard let payload = parseNotificationPayload(userInfo) else {
             return
@@ -145,7 +145,7 @@ class PushNotificationService: NSObject, ObservableObject {
     /// Handle notification tap (user opened app from notification)
     func handleNotificationResponse(_ response: UNNotificationResponse) {
         let userInfo = response.notification.request.content.userInfo
-        print("[Push] Notification tapped: \(userInfo)")
+        debugLog("[Push] Notification tapped: \(userInfo)")
 
         guard let payload = parseNotificationPayload(userInfo) else {
             return
@@ -245,7 +245,7 @@ class PushNotificationService: NSObject, ObservableObject {
                 do {
                     try await UNUserNotificationCenter.current().setBadgeCount(0)
                 } catch {
-                    print("[Push] Failed to clear badge: \(error)")
+                    debugLog("[Push] Failed to clear badge: \(error)")
                 }
             }
         } else {

@@ -29,7 +29,7 @@ class WelcomeConnectLinkedInViewModel: ObservableObject {
             } catch {
                 isConnecting = false
                 errorMessage = "Failed to connect: \(error.localizedDescription)"
-                print("❌ LinkedIn connection error: \(error)")
+                debugLog("❌ LinkedIn connection error: \(error)")
             }
         }
     }

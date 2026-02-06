@@ -90,9 +90,9 @@ class MandatoryTonePersonaSelectionViewModel: ObservableObject {
                 body: ["persona": personaValue],
                 requiresAuth: true
             )
-            print("✅ Persona saved to backend: \(personaValue)")
+            debugLog("✅ Persona saved to backend: \(personaValue)")
         } catch {
-            print("⚠️ Failed to save persona (non-blocking): \(error.localizedDescription)")
+            debugLog("⚠️ Failed to save persona (non-blocking): \(error.localizedDescription)")
             // Non-blocking - continue with onboarding even if this fails
         }
     }

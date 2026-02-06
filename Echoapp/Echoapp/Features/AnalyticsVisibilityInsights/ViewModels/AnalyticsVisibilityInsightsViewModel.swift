@@ -158,7 +158,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         needsReauth = false
 
         do {
-            print("📊 Fetching analytics data...")
+            debugLog("📊 Fetching analytics data...")
 
             // Call backend to get analytics
             let response: AnalyticsResponse = try await APIClient.shared.get(
@@ -207,9 +207,9 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 }
             }
 
-            print("✅ Analytics loaded: connected=\(response.analyticsConnected ?? false), visibility=\(response.visibilityScore)")
+            debugLog("✅ Analytics loaded: connected=\(response.analyticsConnected ?? false), visibility=\(response.visibilityScore)")
         } catch let error as APIError {
-            print("❌ Failed to load analytics: \(error)")
+            debugLog("❌ Failed to load analytics: \(error)")
 
             if error.isScopeError {
                 await MainActor.run {
@@ -224,7 +224,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("❌ Failed to load analytics: \(error)")
+            debugLog("❌ Failed to load analytics: \(error)")
             await MainActor.run {
                 self.analyticsConnected = false
                 self.visibilityScore = 0.0
@@ -251,7 +251,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
             do {
                 _ = try await LinkedInService.shared.connectAnalytics(from: nil)
             } catch {
-                print("❌ Failed to connect analytics: \(error)")
+                debugLog("❌ Failed to connect analytics: \(error)")
             }
             isConnectingAnalytics = false
 
@@ -278,7 +278,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         isLoadingInsights = true
 
         do {
-            print("💡 Fetching AI insights...")
+            debugLog("💡 Fetching AI insights...")
 
             let response: InsightsResponse = try await APIClient.shared.get(
                 endpoint: "/api/analytics/insights",
@@ -294,9 +294,9 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 }
             }
 
-            print("✅ Loaded \(response.insights.count) AI insights")
+            debugLog("✅ Loaded \(response.insights.count) AI insights")
         } catch {
-            print("❌ Failed to load insights: \(error)")
+            debugLog("❌ Failed to load insights: \(error)")
             // Show empty state on error (no hardcoded data)
             await MainActor.run {
                 self.insights = [
@@ -317,7 +317,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         needsReauth = false
 
         do {
-            print("🔄 Force syncing analytics from LinkedIn...")
+            debugLog("🔄 Force syncing analytics from LinkedIn...")
 
             let response: SyncResponse = try await APIClient.shared.post(
                 endpoint: "/api/analytics/sync",
@@ -337,10 +337,10 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                     formatter.formatOptions = [.withFullDate]
                     self.lastUpdated = formatter.date(from: snapshot.snapshotDate)
                 }
-                print("✅ Analytics synced successfully")
+                debugLog("✅ Analytics synced successfully")
             }
         } catch let error as APIError {
-            print("❌ Failed to sync analytics: \(error)")
+            debugLog("❌ Failed to sync analytics: \(error)")
 
             if error.isScopeError {
                 await MainActor.run {
@@ -348,7 +348,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("❌ Failed to sync analytics: \(error)")
+            debugLog("❌ Failed to sync analytics: \(error)")
         }
 
         isSyncing = false
@@ -366,7 +366,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         isLoadingBestTimes = true
 
         do {
-            print("🕐 Fetching best times to post...")
+            debugLog("🕐 Fetching best times to post...")
 
             let response: BestTimesResponse = try await APIClient.shared.get(
                 endpoint: "/api/analytics/best-times",
@@ -379,9 +379,9 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 self.bestTimesDataSource = response.dataSource
             }
 
-            print("✅ Best times loaded: \(response.topSlots.count) top slots, source=\(response.dataSource)")
+            debugLog("✅ Best times loaded: \(response.topSlots.count) top slots, source=\(response.dataSource)")
         } catch {
-            print("❌ Failed to load best times: \(error)")
+            debugLog("❌ Failed to load best times: \(error)")
             // Use empty state on error
             await MainActor.run {
                 self.bestTimesHeatmap = []
@@ -396,7 +396,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
     /// Fetch follower trends
     func fetchFollowerTrends() async {
         do {
-            print("📈 Fetching follower trends...")
+            debugLog("📈 Fetching follower trends...")
 
             let response: FollowerAnalyticsResponse = try await APIClient.shared.get(
                 endpoint: "/api/analytics/followers",
@@ -408,9 +408,9 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
                 self.followerTrends = response.trends
             }
 
-            print("✅ Follower trends loaded: \(response.trends.count) data points")
+            debugLog("✅ Follower trends loaded: \(response.trends.count) data points")
         } catch {
-            print("❌ Failed to load follower trends: \(error)")
+            debugLog("❌ Failed to load follower trends: \(error)")
         }
     }
 
@@ -428,7 +428,7 @@ class AnalyticsVisibilityInsightsViewModel: ObservableObject {
         do {
             try KeychainService.deleteJWT()
         } catch {
-            print("❌ Failed to delete JWT: \(error)")
+            debugLog("❌ Failed to delete JWT: \(error)")
         }
         NotificationCenter.default.post(name: .forceLogout, object: nil)
     }

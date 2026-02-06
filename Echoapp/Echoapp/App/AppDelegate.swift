@@ -22,7 +22,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             PushNotificationService.shared.handleNotification(userInfo: notificationPayload)
         }
 
-        print("[AppDelegate] Application did finish launching")
+        debugLog("[AppDelegate] Application did finish launching")
         return true
     }
 
@@ -45,7 +45,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        print("[AppDelegate] Failed to register for remote notifications: \(error)")
+        debugLog("[AppDelegate] Failed to register for remote notifications: \(error)")
     }
 
     /// Received remote notification (background)

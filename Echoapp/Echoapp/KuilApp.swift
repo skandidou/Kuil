@@ -33,10 +33,10 @@ struct KuilApp: App {
             object: nil,
             queue: .main
         ) { notification in
-            // Handle navigation to published post
             if let postId = notification.userInfo?["postId"] as? String {
-                print("[App] Navigate to published post: \(postId)")
+                debugLog("[App] Navigate to published post: \(postId)")
             }
+            AppState.shared.selectedTab = .home
         }
 
         NotificationCenter.default.addObserver(
@@ -44,8 +44,8 @@ struct KuilApp: App {
             object: nil,
             queue: .main
         ) { _ in
-            // Handle navigation to scheduled posts
-            print("[App] Navigate to scheduled posts")
+            debugLog("[App] Navigate to scheduled posts")
+            AppState.shared.selectedTab = .calendar
         }
 
         NotificationCenter.default.addObserver(
@@ -53,8 +53,8 @@ struct KuilApp: App {
             object: nil,
             queue: .main
         ) { _ in
-            // Handle navigation to analytics
-            print("[App] Navigate to analytics")
+            debugLog("[App] Navigate to analytics")
+            AppState.shared.selectedTab = .analytics
         }
     }
 }

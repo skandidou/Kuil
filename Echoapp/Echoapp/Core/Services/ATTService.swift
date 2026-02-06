@@ -59,15 +59,15 @@ class ATTService: ObservableObject {
         // Log result
         switch status {
         case .authorized:
-            print("[ATT] Tracking authorized - IDFA: \(advertisingIdentifier ?? "N/A")")
+            debugLog("[ATT] Tracking authorized - IDFA: \(advertisingIdentifier ?? "N/A")")
         case .denied:
-            print("[ATT] Tracking denied by user")
+            debugLog("[ATT] Tracking denied by user")
         case .restricted:
-            print("[ATT] Tracking restricted (parental controls, etc.)")
+            debugLog("[ATT] Tracking restricted (parental controls, etc.)")
         case .notDetermined:
-            print("[ATT] Tracking status not determined")
+            debugLog("[ATT] Tracking status not determined")
         @unknown default:
-            print("[ATT] Unknown tracking status")
+            debugLog("[ATT] Unknown tracking status")
         }
 
         return status
@@ -77,13 +77,15 @@ class ATTService: ObservableObject {
     func skipRequest() {
         hasRequestedPermission = true
         UserDefaults.standard.set(true, forKey: hasRequestedKey)
-        print("[ATT] User skipped ATT request")
+        debugLog("[ATT] User skipped ATT request")
     }
 
+    #if DEBUG
     /// Reset for testing purposes
     func resetForTesting() {
         hasRequestedPermission = false
         UserDefaults.standard.set(false, forKey: hasRequestedKey)
-        print("[ATT] Reset for testing")
+        debugLog("[ATT] Reset for testing")
     }
+    #endif
 }

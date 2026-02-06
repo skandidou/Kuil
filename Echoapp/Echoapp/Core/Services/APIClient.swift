@@ -102,9 +102,7 @@ class APIClient {
                 // Check if we should retry
                 if attempt < maxRetries && isRetryableError(error) {
                     let delay = initialRetryDelay * UInt64(pow(2.0, Double(attempt - 1)))
-                    #if DEBUG
-                    print("⚠️ Request failed (attempt \(attempt)/\(maxRetries)), retrying in \(delay / 1_000_000_000)s...")
-                    #endif
+                    debugLog("⚠️ Request failed (attempt \(attempt)/\(maxRetries)), retrying in \(delay / 1_000_000_000)s...")
                     try? await Task.sleep(nanoseconds: delay)
                     continue
                 }
@@ -148,14 +146,11 @@ class APIClient {
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         }
 
-        // Debug logging
-        #if DEBUG
-        print("📡 API Request: \(method) \(endpoint) (timeout: \(timeoutSeconds)s)")
+        debugLog("📡 API Request: \(method) \(endpoint) (timeout: \(timeoutSeconds)s)")
         if let bodyData = request.httpBody,
            let bodyString = String(data: bodyData, encoding: .utf8) {
-            print("📦 Body: \(bodyString)")
+            debugLog("📦 Body: \(bodyString)")
         }
-        #endif
 
         // Execute request
         do {
@@ -165,12 +160,10 @@ class APIClient {
                 throw APIError.invalidResponse
             }
 
-            #if DEBUG
-            print("✅ Response: \(httpResponse.statusCode)")
+            debugLog("✅ Response: \(httpResponse.statusCode)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📥 Data: \(responseString)")
+                debugLog("📥 Data: \(responseString)")
             }
-            #endif
 
             // Check status code
             guard (200...299).contains(httpResponse.statusCode) else {

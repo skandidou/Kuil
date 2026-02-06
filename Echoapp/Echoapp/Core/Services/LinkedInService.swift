@@ -44,7 +44,7 @@ class LinkedInService: NSObject, ObservableObject {
                                   error.localizedDescription.contains("invalidCallback")
 
                 if shouldRetry {
-                    print("🔄 LinkedIn auth failed, retrying... (attempt \(retryCount + 2)/\(maxRetries + 1))")
+                    debugLog("🔄 LinkedIn auth failed, retrying... (attempt \(retryCount + 2)/\(maxRetries + 1))")
                     // Small delay before retry
                     try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                     return try await signIn(from: window, retryCount: retryCount + 1)
@@ -80,13 +80,13 @@ class LinkedInService: NSObject, ObservableObject {
 
                 // CRITICAL: Only resume continuation once
                 guard let storedContinuation = self.authContinuation else {
-                    print("⚠️ Continuation already resumed, ignoring callback")
+                    debugLog("⚠️ Continuation already resumed, ignoring callback")
                     return
                 }
                 self.authContinuation = nil  // Clear immediately to prevent double resume
 
                 if let error = error {
-                    print("❌ LinkedIn OAuth error: \(error.localizedDescription)")
+                    debugLog("❌ LinkedIn OAuth error: \(error.localizedDescription)")
                     storedContinuation.resume(throwing: error)
                     return
                 }
@@ -99,13 +99,13 @@ class LinkedInService: NSObject, ObservableObject {
 
                 // Check for error in callback
                 if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
-                    print("❌ LinkedIn callback error: \(errorParam)")
+                    debugLog("❌ LinkedIn callback error: \(errorParam)")
                     storedContinuation.resume(throwing: LinkedInError.invalidCallback)
                     return
                 }
 
                 guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
-                    print("❌ No token in LinkedIn callback")
+                    debugLog("❌ No token in LinkedIn callback")
                     storedContinuation.resume(throwing: LinkedInError.invalidCallback)
                     return
                 }
@@ -114,7 +114,7 @@ class LinkedInService: NSObject, ObservableObject {
                 do {
                     try KeychainService.saveJWT(token)
                     self.isAuthenticated = true
-                    print("✅ LinkedIn auth successful")
+                    debugLog("✅ LinkedIn auth successful")
                     storedContinuation.resume(returning: token)
                 } catch {
                     storedContinuation.resume(throwing: error)
@@ -131,7 +131,7 @@ class LinkedInService: NSObject, ObservableObject {
 
             // Start the session
             if !session.start() {
-                print("❌ Failed to start ASWebAuthenticationSession")
+                debugLog("❌ Failed to start ASWebAuthenticationSession")
                 // Only resume if continuation hasn't been used yet
                 if let storedContinuation = self.authContinuation {
                     self.authContinuation = nil
@@ -148,7 +148,7 @@ class LinkedInService: NSObject, ObservableObject {
             isAuthenticated = false
             userProfile = nil
         } catch {
-            print("❌ Error signing out: \(error)")
+            debugLog("❌ Error signing out: \(error)")
         }
     }
 
@@ -181,6 +181,19 @@ class LinkedInService: NSObject, ObservableObject {
                 return
             }
 
+            // Track whether continuation has been resumed to prevent double-resume
+            var hasResumed = false
+            let resumeOnce: (Result<Bool, Error>) -> Void = { result in
+                guard !hasResumed else { return }
+                hasResumed = true
+                switch result {
+                case .success(let value):
+                    continuation.resume(returning: value)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
             let session = ASWebAuthenticationSession(
                 url: authURL,
                 callbackURLScheme: Config.appURLScheme
@@ -188,35 +201,35 @@ class LinkedInService: NSObject, ObservableObject {
                 if let error = error {
                     // User cancelled is not an error
                     if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
-                        continuation.resume(returning: false)
+                        resumeOnce(.success(false))
                         return
                     }
-                    print("❌ Analytics OAuth error: \(error.localizedDescription)")
-                    continuation.resume(throwing: error)
+                    debugLog("❌ Analytics OAuth error: \(error.localizedDescription)")
+                    resumeOnce(.failure(error))
                     return
                 }
 
                 guard let url = callbackURL,
                       let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                    continuation.resume(throwing: LinkedInError.invalidCallback)
+                    resumeOnce(.failure(LinkedInError.invalidCallback))
                     return
                 }
 
                 // Check for error in callback
                 if let errorParam = components.queryItems?.first(where: { $0.name == "analytics_error" })?.value {
-                    print("❌ Analytics callback error: \(errorParam)")
-                    continuation.resume(throwing: LinkedInError.invalidCallback)
+                    debugLog("❌ Analytics callback error: \(errorParam)")
+                    resumeOnce(.failure(LinkedInError.invalidCallback))
                     return
                 }
 
                 // Check for success
                 if components.queryItems?.first(where: { $0.name == "analytics_connected" })?.value == "true" {
-                    print("✅ LinkedIn Analytics connected successfully")
-                    continuation.resume(returning: true)
+                    debugLog("✅ LinkedIn Analytics connected successfully")
+                    resumeOnce(.success(true))
                     return
                 }
 
-                continuation.resume(returning: false)
+                resumeOnce(.success(false))
             }
 
             // Store strong reference
@@ -226,8 +239,8 @@ class LinkedInService: NSObject, ObservableObject {
             session.prefersEphemeralWebBrowserSession = true
 
             if !session.start() {
-                print("❌ Failed to start Analytics OAuth session")
-                continuation.resume(throwing: LinkedInError.invalidCallback)
+                debugLog("❌ Failed to start Analytics OAuth session")
+                resumeOnce(.failure(LinkedInError.invalidCallback))
             }
         }
     }
@@ -257,10 +270,11 @@ class LinkedInService: NSObject, ObservableObject {
     }
 
     /// Publish a new post to LinkedIn
+    /// Uses postNoRetry to prevent duplicate posts on network flaps
     func publishPost(content: String) async throws -> String {
         let body: [String: Any] = ["content": content]
 
-        let response: PublishPostResponse = try await APIClient.shared.post(
+        let response: PublishPostResponse = try await APIClient.shared.postNoRetry(
             endpoint: Config.Endpoints.linkedInPublish,
             body: body
         )

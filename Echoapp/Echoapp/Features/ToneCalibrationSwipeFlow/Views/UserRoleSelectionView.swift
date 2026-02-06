@@ -221,7 +221,7 @@ struct UserRoleSelectionView: View {
         // Save user role to backend
         Task {
             do {
-                print("💾 Saving user role: \(role.title)")
+                debugLog("💾 Saving user role: \(role.title)")
 
                 struct UpdateRoleRequest: Codable {
                     let role: String
@@ -233,7 +233,7 @@ struct UserRoleSelectionView: View {
                     requiresAuth: true
                 )
 
-                print("✅ User role saved successfully")
+                debugLog("✅ User role saved successfully")
 
                 // Update app state immediately (don't wait for next profile fetch)
                 await MainActor.run {
@@ -241,7 +241,7 @@ struct UserRoleSelectionView: View {
                     if var profile = AppState.shared.userProfile {
                         profile.role = role.title  // Update with the newly selected role
                         AppState.shared.userProfile = profile  // Reassign to trigger observation
-                        print("✅ Updated AppState.userProfile.role to: \(role.title)")
+                        debugLog("✅ Updated AppState.userProfile.role to: \(role.title)")
                     }
 
                     // Dismiss and complete onboarding
@@ -249,7 +249,7 @@ struct UserRoleSelectionView: View {
                     dismiss()
                 }
             } catch {
-                print("❌ Failed to save user role: \(error)")
+                debugLog("❌ Failed to save user role: \(error)")
                 // Continue anyway - not critical
                 await MainActor.run {
                     NotificationCenter.default.post(name: .toneCalibrationCompleted, object: nil)

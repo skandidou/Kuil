@@ -54,33 +54,33 @@ class UserService {
 
     /// Fetch complete user profile with voice signature
     func fetchProfile() async throws -> UserProfileResponse {
-        print("📥 Fetching user profile...")
+        debugLog("📥 Fetching user profile...")
 
         let response: UserProfileResponse = try await APIClient.shared.get(
             endpoint: Config.Endpoints.userProfile,
             requiresAuth: true
         )
 
-        print("✅ Profile fetched:", response.name)
+        debugLog("✅ Profile fetched: \(response.name)")
         return response
     }
 
     /// Fetch user statistics
     func fetchStats() async throws -> UserStatsResponse {
-        print("📊 Fetching user stats...")
+        debugLog("📊 Fetching user stats...")
 
         let response: UserStatsResponse = try await APIClient.shared.get(
             endpoint: Config.Endpoints.userStats,
             requiresAuth: true
         )
 
-        print("✅ Stats fetched: \(response.totalPosts) posts, visibility: \(response.visibilityScore)")
+        debugLog("✅ Stats fetched: \(response.totalPosts) posts, visibility: \(response.visibilityScore)")
         return response
     }
 
     /// Sync LinkedIn posts to refresh cached data
     func syncLinkedInPosts() async throws {
-        print("🔄 Syncing LinkedIn posts...")
+        debugLog("🔄 Syncing LinkedIn posts...")
 
         struct SyncResponse: Codable {
             let success: Bool
@@ -93,6 +93,6 @@ class UserService {
             requiresAuth: true
         )
 
-        print("✅ Synced \(response.postsCount) LinkedIn posts")
+        debugLog("✅ Synced \(response.postsCount) LinkedIn posts")
     }
 }

@@ -73,7 +73,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         isGenerating = true
 
         do {
-            print("🤖 Generating post content with enhanced AI...")
+            debugLog("🤖 Generating post content with enhanced AI...")
 
             // Build request body with personalization
             var body: [String: Any] = [
@@ -85,7 +85,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
             let personalization = PersonalizationContext.current()
             body.merge(personalization.toDictionary()) { _, new in new }
 
-            print("🎯 Generating with personalization: \(personalization.debugDescription)")
+            debugLog("🎯 Generating with personalization: \(personalization.debugDescription)")
 
             // Use enhanced endpoint for calibrated scoring
             let response: SinglePostResponse = try await APIClient.shared.post(
@@ -103,10 +103,10 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 }
             }
 
-            print("✅ Post generated with hook score: \(response.hookScore), calibrated: \(response.calibratedHookScore ?? response.hookScore)")
+            debugLog("✅ Post generated with hook score: \(response.hookScore), calibrated: \(response.calibratedHookScore ?? response.hookScore)")
         } catch {
             // Fallback to standard endpoint if enhanced not available
-            print("⚠️ Enhanced generation failed, falling back to standard: \(error)")
+            debugLog("⚠️ Enhanced generation failed, falling back to standard: \(error)")
             do {
                 var body: [String: Any] = ["prompt": prompt, "sourceType": sourceType]
                 let personalization = PersonalizationContext.current()
@@ -125,7 +125,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                     }
                 }
             } catch {
-                print("❌ Failed to generate post: \(error)")
+                debugLog("❌ Failed to generate post: \(error)")
                 await MainActor.run {
                     self.content = "Start writing your post here..."
                     self.hookScore = 0
@@ -345,7 +345,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         isCalculatingScore = true
 
         do {
-            print("📊 Calculating hook score from API...")
+            debugLog("📊 Calculating hook score from API...")
 
             struct HookScoreResponse: Codable {
                 let score: Int
@@ -370,9 +370,9 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 self.isCalculatingScore = false
             }
 
-            print("✅ Hook score from API: \(response.score)")
+            debugLog("✅ Hook score from API: \(response.score)")
         } catch {
-            print("❌ Failed to calculate hook score from API: \(error)")
+            debugLog("❌ Failed to calculate hook score from API: \(error)")
             // Keep local score - don't reset
             await MainActor.run {
                 self.isCalculatingScore = false
@@ -396,7 +396,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            print("📤 Publishing post to LinkedIn...")
+            debugLog("📤 Publishing post to LinkedIn...")
 
             struct PublishResponse: Codable {
                 let success: Bool
@@ -409,7 +409,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 body: ["content": content]
             )
 
-            print("✅ Post published successfully: \(response.linkedinPostId ?? "unknown")")
+            debugLog("✅ Post published successfully: \(response.linkedinPostId ?? "unknown")")
 
             await MainActor.run {
                 self.successMessage = "Posted Successfully!"
@@ -417,7 +417,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 NotificationCenter.default.post(name: .editorPost, object: nil)
             }
         } catch let error as APIError {
-            print("❌ Failed to publish post: \(error)")
+            debugLog("❌ Failed to publish post: \(error)")
             await MainActor.run {
                 switch error {
                 case .serverError(_, let message):
@@ -432,7 +432,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 self.showError = true
             }
         } catch {
-            print("❌ Failed to publish post: \(error)")
+            debugLog("❌ Failed to publish post: \(error)")
             await MainActor.run {
                 self.errorMessage = "An unexpected error occurred. Please try again."
                 self.showError = true
@@ -482,7 +482,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         isGenerating = true
 
         do {
-            print("🤖 Improving post with AI...")
+            debugLog("🤖 Improving post with AI...")
 
             // Build request body with personalization
             var body: [String: Any] = ["content": content]
@@ -506,9 +506,9 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 }
             }
 
-            print("✅ Post improved with hook score: \(response.hookScore)")
+            debugLog("✅ Post improved with hook score: \(response.hookScore)")
         } catch {
-            print("❌ Failed to improve post: \(error)")
+            debugLog("❌ Failed to improve post: \(error)")
         }
 
         isGenerating = false
@@ -536,7 +536,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            print("📅 Scheduling post for: \(scheduledDate)")
+            debugLog("📅 Scheduling post for: \(scheduledDate)")
 
             // Use postNoRetry to prevent duplicate scheduling from retry mechanism
             let response: SchedulePostResponse = try await APIClient.shared.postNoRetry(
@@ -547,7 +547,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 ]
             )
 
-            print("✅ Post scheduled for: \(response.scheduledAt ?? "unknown time")")
+            debugLog("✅ Post scheduled for: \(response.scheduledAt ?? "unknown time")")
 
             await MainActor.run {
                 self.showSchedulePicker = false
@@ -556,7 +556,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 NotificationCenter.default.post(name: .editorScheduled, object: nil)
             }
         } catch let error as APIError {
-            print("❌ Failed to schedule post: \(error)")
+            debugLog("❌ Failed to schedule post: \(error)")
             await MainActor.run {
                 switch error {
                 case .serverError(_, let message):
@@ -571,7 +571,7 @@ class SmartAIEditorHookScorerViewModel: ObservableObject {
                 self.showError = true
             }
         } catch {
-            print("❌ Failed to schedule post: \(error)")
+            debugLog("❌ Failed to schedule post: \(error)")
             await MainActor.run {
                 self.errorMessage = "An unexpected error occurred. Please try again."
                 self.showError = true

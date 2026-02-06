@@ -61,7 +61,7 @@ class ClaudeService: ObservableObject {
         let personalization = PersonalizationContext.current()
         body.merge(personalization.toDictionary()) { _, new in new }
 
-        print("🎯 Generating with personalization: \(personalization.debugDescription)")
+        debugLog("🎯 Generating with personalization: \(personalization.debugDescription)")
 
         let response: GeneratePostResponse = try await APIClient.shared.post(
             endpoint: Config.Endpoints.voiceGenerate,
@@ -90,7 +90,7 @@ class ClaudeService: ObservableObject {
         let personalization = PersonalizationContext.current()
         body.merge(personalization.toDictionary()) { _, new in new }
 
-        print("🎯 Generating with personalization: \(personalization.debugDescription)")
+        debugLog("🎯 Generating with personalization: \(personalization.debugDescription)")
 
         let response: GeneratePostResponse = try await APIClient.shared.post(
             endpoint: Config.Endpoints.voiceGenerate,

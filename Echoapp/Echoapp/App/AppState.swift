@@ -57,7 +57,7 @@ class AppState: ObservableObject {
 
         // Only restore if we have a JWT (user was authenticated before)
         guard KeychainService.hasJWT() else {
-            print("🔑 No JWT found, starting fresh onboarding")
+            debugLog("🔑 No JWT found, starting fresh onboarding")
             return
         }
 
@@ -68,11 +68,11 @@ class AppState: ObservableObject {
         hasSeenProfilescope = defaults.bool(forKey: Keys.hasSeenProfilescope)
 
         if hasCompletedOnboarding {
-            print("✅ Onboarding state restored from UserDefaults — skipping setup")
+            debugLog("✅ Onboarding state restored from UserDefaults — skipping setup")
             // Also reload user data in background
             Task { await loadUserData() }
         } else if isAuthenticated {
-            print("🔄 Partial onboarding state restored — resuming from where user left off")
+            debugLog("🔄 Partial onboarding state restored — resuming from where user left off")
         }
     }
 
@@ -111,31 +111,27 @@ class AppState: ObservableObject {
 
     /// Load user profile and stats after authentication
     func loadUserData() async {
-        print("🔄 Loading user data...")
+        debugLog("🔄 Loading user data...")
 
         do {
             // Fetch profile
             let profile = try await UserService.shared.fetchProfile()
-            await MainActor.run {
-                self.userProfile = profile
-                if let topics = profile.topicPreferences, !topics.isEmpty {
-                    self.selectedTopics = topics
-                }
+            self.userProfile = profile
+            if let topics = profile.topicPreferences, !topics.isEmpty {
+                self.selectedTopics = topics
             }
-            print("✅ User profile loaded: \(profile.name)")
+            debugLog("✅ User profile loaded: \(profile.name)")
 
             // Fetch stats
             let stats = try await UserService.shared.fetchStats()
-            await MainActor.run {
-                self.userStats = stats
-            }
-            print("✅ User stats loaded: visibility \(stats.visibilityScore)")
+            self.userStats = stats
+            debugLog("✅ User stats loaded: visibility \(stats.visibilityScore)")
 
             // Also load success patterns centrally
             await loadSuccessPatternsIfNeeded()
 
         } catch {
-            print("❌ Failed to load user data: \(error)")
+            debugLog("❌ Failed to load user data: \(error)")
         }
     }
 
@@ -170,15 +166,23 @@ class AppState: ObservableObject {
 
             self.successPatterns = map
             self.successPatternsLastFetched = Date()
-            print("✅ Success patterns loaded centrally: \(response.patterns.count) patterns")
+            debugLog("✅ Success patterns loaded centrally: \(response.patterns.count) patterns")
         } catch {
-            print("⚠️ Could not load success patterns: \(error)")
+            debugLog("⚠️ Could not load success patterns: \(error)")
         }
     }
 
     /// Sign out user and reset app state
     func signOut() {
-        print("👋 Signing out user...")
+        debugLog("👋 Signing out user...")
+
+        // Delete JWT from Keychain (security: prevent stale credentials)
+        try? KeychainService.deleteJWT()
+
+        // Unregister device from push notifications
+        Task {
+            await PushNotificationService.shared.unregisterDevice()
+        }
 
         // Reset all authentication state
         isAuthenticated = false
@@ -208,7 +212,7 @@ class AppState: ObservableObject {
         selectedTab = .home
         navigationPath = NavigationPath()
 
-        print("✅ User signed out successfully")
+        debugLog("✅ User signed out successfully")
     }
 }
 

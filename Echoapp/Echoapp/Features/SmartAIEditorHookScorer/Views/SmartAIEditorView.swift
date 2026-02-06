@@ -503,11 +503,11 @@ struct SmartAIEditorView: View {
                 if let text, !text.isEmpty {
                     cvExtractedText = text
                     inputText = text
-                    print("✅ CV text extracted: \(text.prefix(200))...")
+                    debugLog("✅ CV text extracted: \(text.prefix(200))...")
                 } else {
                     cvFileName = nil
                     cvExtractedText = nil
-                    print("❌ Could not extract text from CV")
+                    debugLog("❌ Could not extract text from CV")
                 }
                 isExtractingText = false
             }
@@ -525,11 +525,11 @@ struct SmartAIEditorView: View {
                 if let text, !text.isEmpty {
                     cvExtractedText = text
                     inputText = text
-                    print("✅ CV text extracted from image: \(text.prefix(200))...")
+                    debugLog("✅ CV text extracted from image: \(text.prefix(200))...")
                 } else {
                     cvFileName = nil
                     cvExtractedText = nil
-                    print("❌ Could not extract text from image")
+                    debugLog("❌ Could not extract text from image")
                 }
                 isExtractingText = false
             }
@@ -591,7 +591,7 @@ struct SmartAIEditorView: View {
             do {
                 try handler.perform([request])
             } catch {
-                print("❌ Vision OCR failed: \(error)")
+                debugLog("❌ Vision OCR failed: \(error)")
                 continuation.resume(returning: nil)
             }
         }

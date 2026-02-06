@@ -399,7 +399,7 @@ struct ProfileScopeResultView: View {
                     }
                 }
             } catch {
-                print("Failed to load voice signature: \(error)")
+                debugLog("Failed to load voice signature: \(error)")
 
                 // Show default content on error
                 await MainActor.run {
@@ -538,6 +538,6 @@ enum ProfileArchetype {
 
 #Preview {
     ProfileScopeResultView {
-        print("Complete")
+        debugLog("Complete")
     }
 }

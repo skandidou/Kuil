@@ -78,7 +78,7 @@ class NotificationEngagementCenterViewModel: ObservableObject {
         isLoading = true
 
         do {
-            print("📋 Fetching user activities...")
+            debugLog("📋 Fetching user activities...")
 
             let response: UserActivityResponse = try await APIClient.shared.get(
                 endpoint: "/api/user/activity",
@@ -125,9 +125,9 @@ class NotificationEngagementCenterViewModel: ObservableObject {
                 self.earlierNotifications = earlier
             }
 
-            print("✅ Loaded \(response.activities.count) activity items")
+            debugLog("✅ Loaded \(response.activities.count) activity items")
         } catch {
-            print("❌ Failed to load activities: \(error)")
+            debugLog("❌ Failed to load activities: \(error)")
             // Show empty state on error (no hardcoded data)
             await MainActor.run {
                 self.recentNotifications = []

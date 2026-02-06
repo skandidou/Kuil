@@ -33,7 +33,7 @@ class DailySparkViewModel: ObservableObject {
         isLoading = true
 
         do {
-            print("✨ Loading daily spark ideas...")
+            debugLog("✨ Loading daily spark ideas...")
 
             let response: DailySparkResponse = try await APIClient.shared.get(
                 endpoint: "/api/voice/daily-spark",
@@ -41,9 +41,9 @@ class DailySparkViewModel: ObservableObject {
             )
 
             ideas = response.ideas
-            print("✅ Loaded \(ideas.count) daily spark ideas")
+            debugLog("✅ Loaded \(ideas.count) daily spark ideas")
         } catch {
-            print("❌ Failed to load daily spark: \(error)")
+            debugLog("❌ Failed to load daily spark: \(error)")
             // Fallback ideas
             ideas = [
                 DailySparkIdea(
@@ -70,7 +70,7 @@ class DailySparkViewModel: ObservableObject {
         isLoading = true
 
         do {
-            print("🤖 Generating post from Daily Spark idea: \(idea.title)")
+            debugLog("🤖 Generating post from Daily Spark idea: \(idea.title)")
 
             struct GeneratePostResponse: Codable {
                 let content: String
@@ -97,9 +97,9 @@ class DailySparkViewModel: ObservableObject {
                 )
             }
 
-            print("✅ Generated post from Daily Spark")
+            debugLog("✅ Generated post from Daily Spark")
         } catch {
-            print("❌ Failed to generate post from Daily Spark: \(error)")
+            debugLog("❌ Failed to generate post from Daily Spark: \(error)")
             await MainActor.run {
                 selectedIdea = nil
             }
@@ -112,7 +112,7 @@ class DailySparkViewModel: ObservableObject {
         isLoading = true
 
         do {
-            print("🤖 Generating post from inspiration: \(topic)")
+            debugLog("🤖 Generating post from inspiration: \(topic)")
 
             struct GeneratePostResponse: Codable {
                 let content: String
@@ -139,9 +139,9 @@ class DailySparkViewModel: ObservableObject {
                 )
             }
 
-            print("✅ Generated post from inspiration")
+            debugLog("✅ Generated post from inspiration")
         } catch {
-            print("❌ Failed to generate post from inspiration: \(error)")
+            debugLog("❌ Failed to generate post from inspiration: \(error)")
         }
 
         isLoading = false

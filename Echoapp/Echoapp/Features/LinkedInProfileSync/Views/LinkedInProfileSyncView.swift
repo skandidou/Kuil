@@ -417,7 +417,7 @@ struct LinkedInProfileSyncView: View {
         isLoading = true
         showError = false
 
-        print("📤 Syncing LinkedIn posts with URL: \(cleanURL)")
+        debugLog("📤 Syncing LinkedIn posts with URL: \(cleanURL)")
 
         Task {
             do {
@@ -477,7 +477,7 @@ extension View {
 
 #Preview {
     LinkedInProfileSyncView(
-        onComplete: { print("Complete") },
-        onSkip: { print("Skip") }
+        onComplete: { debugLog("Complete") },
+        onSkip: { debugLog("Skip") }
     )
 }

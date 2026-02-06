@@ -9,8 +9,8 @@ import SwiftUI
 
 struct MainDashboardView: View {
     @ObservedObject var viewModel: MainDashboardViewModel
+    @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) var colorScheme
-    @State private var selectedTab: MainTab = .home
     @State private var showCreateContent = false
     @State private var showNotifications = false
     @State private var showAnalytics = false
@@ -27,7 +27,7 @@ struct MainDashboardView: View {
             Color.adaptiveBackground(colorScheme)
                 .ignoresSafeArea()
 
-            TabView(selection: $selectedTab) {
+            TabView(selection: $appState.selectedTab) {
                 DashboardHomeView(viewModel: viewModel)
                     .tabItem {
                         Label("Home", systemImage: "house.fill")
@@ -173,12 +173,12 @@ struct DashboardHomeView: View {
                                             .font(.system(size: 40))
                                             .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
 
-                                        Text("Connectez vos analytics")
+                                        Text("Connect your analytics")
                                             .font(.caption)
                                             .fontWeight(.semibold)
                                             .foregroundColor(Color.adaptivePrimaryText(colorScheme))
 
-                                        Text("pour voir votre score")
+                                        Text("to see your score")
                                             .font(.caption2)
                                             .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
                                     }
@@ -318,28 +318,11 @@ struct DashboardHomeView: View {
 
                     // Daily Inspiration
                     VStack(alignment: .leading, spacing: Spacing.md) {
-                        HStack {
-                            Text("Daily Inspiration")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(Color.adaptivePrimaryText(colorScheme))
-
-                            Spacer()
-
-                            Button(action: {
-                                // Refine action
-                            }) {
-                                Text("REFINE AI")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.accentCyan)
-                                    .padding(.horizontal, Spacing.sm)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentCyan.opacity(0.15))
-                                    .cornerRadius(4)
-                            }
-                        }
-                        .padding(.horizontal, Spacing.md)
+                        Text("Daily Inspiration")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.adaptivePrimaryText(colorScheme))
+                            .padding(.horizontal, Spacing.md)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: Spacing.md) {
@@ -358,10 +341,25 @@ struct DashboardHomeView: View {
                             .fontWeight(.bold)
                             .foregroundColor(Color.adaptivePrimaryText(colorScheme))
                             .padding(.horizontal, Spacing.md)
-                        
+
                         if let nextItem = viewModel.nextScheduledItem {
                             ScheduledItemCard(item: nextItem)
                                 .padding(.horizontal, Spacing.md)
+                        } else {
+                            HStack(spacing: Spacing.md) {
+                                Image(systemName: "calendar.badge.plus")
+                                    .font(.title3)
+                                    .foregroundColor(Color.adaptiveTertiaryText(colorScheme))
+
+                                Text("No posts scheduled yet")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(Spacing.md)
+                            .background(Color.adaptiveSecondaryBackground(colorScheme))
+                            .cornerRadius(CornerRadius.medium)
+                            .padding(.horizontal, Spacing.md)
                         }
                     }
                 }
@@ -509,14 +507,6 @@ struct ScheduledItemCard: View {
             }
             
             Spacer()
-            
-            Button(action: {
-                // Edit action
-            }) {
-                Image(systemName: "pencil")
-                    .foregroundColor(Color.adaptiveSecondaryText(colorScheme))
-                    .font(.callout)
-            }
         }
         .padding(Spacing.md)
         .background(Color.adaptiveSecondaryBackground(colorScheme))
